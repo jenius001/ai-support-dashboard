@@ -229,6 +229,8 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
 .sv-table tr.is-crit td { background: var(--sv-bad-bg); }
 .sv-table tr.is-overdue td { background: var(--sv-warn-bg); }
 
+/* standalone: the hidden attribute always wins over display rules */
+[hidden], .sv [hidden], .sv-view[hidden], .sv-adv[hidden], .sv-drawer[hidden] { display: none !important; }
 </style>
 
 <div class="sv">
