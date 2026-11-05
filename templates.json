@@ -1,0 +1,212 @@
+[
+{
+"template_id": "m01",
+"kind": "message",
+"text": "Hi, where is my order? It was supposed to arrive yesterday."
+},
+{
+"template_id": "r01",
+"kind": "reply",
+"text": "Your order is with the carrier and out for delivery today. Here is your tracking link."
+},
+{
+"template_id": "m02",
+"kind": "message",
+"text": "My delivery keeps getting pushed back. When will it actually come?"
+},
+{
+"template_id": "r02",
+"kind": "reply",
+"text": "Sorry for the wait. The carrier now shows delivery by Thursday. Here is the latest tracking update."
+},
+{
+"template_id": "m03",
+"kind": "message",
+"text": "It says delivered, but I never got it."
+},
+{
+"template_id": "r03",
+"kind": "reply",
+"text": "I'm sorry. I've checked the carrier record: it shows delivered on Tuesday at 3:12 pm."
+},
+{
+"template_id": "m04",
+"kind": "message",
+"text": "I want a refund for the blender I bought."
+},
+{
+"template_id": "r04",
+"kind": "reply",
+"text": "I can help with that. Here is our return policy and how to start a refund."
+},
+{
+"template_id": "m05",
+"kind": "message",
+"text": "How do I return a jacket that doesn't fit?"
+},
+{
+"template_id": "r05",
+"kind": "reply",
+"text": "You can start a free return within 30 days. Here is your return label."
+},
+{
+"template_id": "m06",
+"kind": "message",
+"text": "Someone changed my password and placed an order I didn't make."
+},
+{
+"template_id": "r06",
+"kind": "reply",
+"text": "I'm sorry. This needs our security team, so I'm connecting you with a person now."
+},
+{
+"template_id": "m07",
+"kind": "message",
+"text": "This is the third time my order arrived damaged. I'm really unhappy."
+},
+{
+"template_id": "r07",
+"kind": "reply",
+"text": "I'm sorry this keeps happening. I'm bringing in a member of our team who can sort this out."
+},
+{
+"template_id": "d01",
+"kind": "decision",
+"text": "Resolved alone: answered from verified order and policy information, within its permissions."
+},
+{
+"template_id": "d02",
+"kind": "decision",
+"text": "Escalated: detected frustration in the customer's tone and handed off."
+},
+{
+"template_id": "d03",
+"kind": "decision",
+"text": "Escalated: refund request routed to a person for approval."
+},
+{
+"template_id": "d04",
+"kind": "decision",
+"text": "Escalated: the customer asked for a person."
+},
+{
+"template_id": "d05",
+"kind": "decision",
+"text": "Escalated: two attempts didn't resolve the issue."
+},
+{
+"template_id": "d06",
+"kind": "decision",
+"text": "Escalated: not confident enough in the customer's language."
+},
+{
+"template_id": "d07",
+"kind": "decision",
+"text": "Escalated immediately: possible account takeover or fraud."
+},
+{
+"template_id": "d08",
+"kind": "decision",
+"text": "Escalated immediately: the customer shared sensitive information."
+},
+{
+"template_id": "n01",
+"kind": "note",
+"text": "Not in this week's QA sample, so it hasn't been scored."
+},
+{
+"template_id": "n02",
+"kind": "note",
+"text": "Accurate, clear and polite. The decision matched the situation."
+},
+{
+"template_id": "n03",
+"kind": "note",
+"text": "Right outcome and decision, with minor wording or tone issues."
+},
+{
+"template_id": "n04",
+"kind": "note",
+"text": "Decision was right, but part of the reply was incomplete and needed correcting."
+},
+{
+"template_id": "n05",
+"kind": "note",
+"text": "Decision was right, but the reply contained wrong information."
+},
+{
+"template_id": "n06",
+"kind": "note",
+"text": "Reply was accurate and polite, but escalation wasn't needed: a simple request handed to a person. Rubric v1 didn't penalize unnecessary handoffs, so it still passed. Flagged for calibration."
+},
+{
+"template_id": "n07",
+"kind": "note",
+"text": "Minor wording issues, and escalation wasn't needed. Rubric v1 didn't penalize the unnecessary handoff. Flagged for calibration."
+},
+{
+"template_id": "n08",
+"kind": "note",
+"text": "Incomplete reply, and the decision was wrong."
+},
+{
+"template_id": "n09",
+"kind": "note",
+"text": "Wrong decision: this should have gone to a person."
+},
+{
+"template_id": "n10",
+"kind": "note",
+"text": "Critical failure: the reply included another customer's order details. Immediate review."
+},
+{
+"template_id": "s01",
+"kind": "step",
+"text": "No action needed."
+},
+{
+"template_id": "s02",
+"kind": "step",
+"text": "Customer came back about the same issue: review whether the answer really solved it."
+},
+{
+"template_id": "s03",
+"kind": "step",
+"text": "Immediate review: contain the privacy issue, notify the client, and fix the agent's instructions."
+},
+{
+"template_id": "s04",
+"kind": "step",
+"text": "Calibrate: add examples so simple requests with an upset tone stay with the AI."
+},
+{
+"template_id": "s05",
+"kind": "step",
+"text": "Calibrate: this case should have gone to a person. Add it as a test case."
+},
+{
+"template_id": "s06",
+"kind": "step",
+"text": "Handled by a person. Confirm the customer's issue was resolved."
+},
+{
+"template_id": "s07",
+"kind": "step",
+"text": "Picked up late. Check queue staffing for this time slot."
+},
+{
+"template_id": "s08",
+"kind": "step",
+"text": "Waiting for a person. Pick up before the SLA is reached."
+},
+{
+"template_id": "s09",
+"kind": "step",
+"text": "Overdue: past the SLA. Assign now and update the customer."
+},
+{
+"template_id": "n11",
+"kind": "note",
+"text": "Not in the random QA sample, so it has no QA level. It was reviewed in a targeted risk audit instead: see the audit finding."
+}
+]

@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Support Dashboard · Prototype · Jeannie Demir</title>
+<meta name="description" content="Prototype supervisor dashboard for an AI customer-support agent, with simulated data. Prepared by Jeannie Demir.">
+<style>
+:root { --font-anthropic-sans: system-ui, sans-serif; }
+html, body { margin: 0; background: #f5f5f7; }
+body:has(.sv.is-dark) { background: #000; }
+#dash-root { padding: clamp(8px, 2vw, 24px); }
+</style>
+<script src="d3.min.js"></script>
+<script>
+/* Small stand-in for the hosted dashboard runtime, so this page runs as a plain static site. */
+(function () {
+  const store = {}, calcs = [], draws = {}, ons = [];
+  let params = {};
+  const hiddenUp = (el) => { for (let e = el; e; e = e.parentElement) if (e.hidden) return true; return false; };
+  const safe = (f, ...a) => { try { f(...a); } catch (e) { console.error(e); } };
+  const runDraws = () => { for (const [n, fn] of Object.entries(draws)) document.querySelectorAll(`[data-draw="${n}"]`).forEach((el) => { if (!hiddenUp(el)) safe(fn, el); }); };
+  const runAll = () => { ons.forEach((f) => safe(f)); runDraws(); ons.forEach((f) => safe(f)); runDraws(); };
+  window.dash = {
+    data: (id) => store[id] || { status: 'loading', data: [], columns: [] },
+    calc: (id, spec) => { calcs.push([id, spec]); store[id] = { status: 'loading', data: [], columns: [] }; },
+    draw: (name, fn) => {
+      if (fn) { draws[name] = fn; return; }
+      document.querySelectorAll(`[data-draw="${name}"]`).forEach((el) => { if (!hiddenUp(el)) safe(draws[name], el); });
+    },
+    onData: (fn) => { ons.push(fn); },
+    params: () => ({ ...params }),
+    setParams: (o) => { for (const [k, v] of Object.entries(o)) { if (v == null || v === '') delete params[k]; else params[k] = v; } runAll(); },
+    resetParams: () => { params = {}; runAll(); },
+    colors: ['#5e6ad2', '#2f7d73', '#b25f00', '#8e8e93', '#c4291c', '#1f7a3e', '#7b5ce6', '#1fb5d6'],
+  };
+  // plain browser download for the CSV export
+  window.claude = { use: async (name) => name !== 'downloads' ? null : {
+    save: async ({ filename, data }) => {
+      const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }));
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+  } };
+  window.__svLoad = () => Promise.all([d3.csv('records.csv'), d3.json('templates.json'), d3.json('rubric.json')]).then(([records, templates, rubric]) => {
+    store.conversations = { status: 'ok', data: records, columns: records.columns };
+    store.templates = { status: 'ok', data: templates, columns: Object.keys(templates[0] || {}) };
+    store.rubric = { status: 'ok', data: rubric, columns: Object.keys(rubric[0] || {}) };
+    for (const [id, spec] of calcs) {
+      const out = spec.fn(...spec.inputs.map((i) => store[i].data));
+      store[id] = { status: 'ok', data: out, columns: out[0] ? Object.keys(out[0]) : [] };
+    }
+    runAll();
+    let t;
+    window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(runAll, 120); });
+    document.addEventListener('toggle', () => requestAnimationFrame(runAll), true);
+  }).catch((e) => { console.error(e); document.body.insertAdjacentHTML('afterbegin', '<p style="padding:16px;font-family:system-ui">Couldn\u2019t load the sample data. Open this page through a web server (for example Vercel), not as a local file.</p>'); });
+})();
+</script>
+</head>
+<body>
+<div id="dash-root">
+<style>
+#dash-root { --dash-gutter: clamp(12px, 3vw, 40px); }
+.sv { --sv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", var(--font-anthropic-sans), sans-serif;
+  --sv-bg: #f5f5f7; --sv-card: #ffffff; --sv-fg: #1d1d1f; --sv-muted: #6e6e73; --sv-line: #e3e3e8; --sv-soft: #f0f0f3;
+  --sv-ai: #2f7d73; --sv-esc: #5e6ad2; --sv-esc-soft: #c9cdf3; --sv-warn: #b25f00; --sv-warn-bg: #fff4e5; --sv-bad: #c4291c; --sv-bad-bg: #fdecea; --sv-ok: #1f7a3e; --sv-ok-bg: #e8f5ec; --sv-neutral: #8e8e93; --sv-focus: #0071e3;
+  --sv-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.05);
+  font-family: var(--sv-font); color: var(--sv-fg); background: var(--sv-bg); border-radius: 20px; padding: clamp(14px, 2.4vw, 32px);
+  display: flex; flex-direction: column; gap: 22px; letter-spacing: -0.003em; max-width: 1440px; margin-inline: auto; }
+.sv.is-dark { --sv-bg: #000000; --sv-card: #1c1c1e; --sv-fg: #f5f5f7; --sv-muted: #a1a1a6; --sv-line: #38383a; --sv-soft: #2c2c2e;
+  --sv-ai: #5cc2b4; --sv-esc: #8e97f0; --sv-esc-soft: #3d4170; --sv-warn: #ffb340; --sv-warn-bg: #3a2a10; --sv-bad: #ff6961; --sv-bad-bg: #3b1714; --sv-ok: #4cd77a; --sv-ok-bg: #12301c; --sv-neutral: #8e8e93; --sv-focus: #4aa3ff;
+  --sv-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.sv :focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: 6px; }
+.sv button { font: inherit; color: inherit; }
+.sv-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.sv-title { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.022em; line-height: 1.1; }
+.sv-sub { margin: 4px 0 0; color: var(--sv-muted); font-size: 15px; }
+.sv-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sv-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sv-muted); }
+.sv select, .sv input[type=search] { font: inherit; font-size: 13px; color: var(--sv-fg); background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 10px; padding: 6px 10px; }
+.sv-btn { font-size: 13px; font-weight: 600; background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+.sv-btn:hover { background: var(--sv-soft); }
+.sv-btn[aria-pressed=true] { background: var(--sv-fg); color: var(--sv-bg); border-color: var(--sv-fg); }
+.sv-link { background: none; border: 0; padding: 0; color: var(--sv-focus); font-size: 13px; font-weight: 600; cursor: pointer; }
+.sv-card { background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--sv-shadow); min-width: 0; }
+.sv-h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.012em; }
+.sv-cap { margin: 2px 0 12px; color: var(--sv-muted); font-size: 12.5px; line-height: 1.45; }
+.sv-info { font-size: 13px; }
+.sv-info summary { cursor: pointer; color: var(--sv-focus); font-weight: 600; list-style: none; }
+.sv-info summary::-webkit-details-marker { display: none; }
+.sv-info-body { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px 24px; color: var(--sv-fg); line-height: 1.5; }
+.sv-info-body p { margin: 0; }
+.sv .sv-info-body b { font-weight: 650; }
+.sv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.sv-kpi { text-align: left; background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--sv-shadow); cursor: pointer; display: flex; flex-direction: column; gap: 3px; transition: border-color .15s; }
+.sv-kpi:hover { border-color: var(--sv-muted); }
+.sv-kpi.is-alert { border-color: var(--sv-bad); background: var(--sv-bad-bg); }
+.sv-kpi-label { font-size: 12.5px; font-weight: 600; color: var(--sv-muted); display: flex; align-items: center; gap: 6px; }
+.sv-kpi-flag { font-size: 10.5px; font-weight: 700; color: var(--sv-bad); text-transform: uppercase; letter-spacing: .04em; }
+.sv-kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sv-kpi-cmp { font-size: 12px; color: var(--sv-muted); font-variant-numeric: tabular-nums; }
+.sv-kpi-def { font-size: 11.5px; color: var(--sv-muted); line-height: 1.35; margin-top: 4px; }
+.sv-kpi-go { font-size: 11.5px; color: var(--sv-focus); font-weight: 600; margin-top: 2px; }
+.sv-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; align-items: start; }
+.sv-strip { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--sv-muted); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.sv .sv-strip b { color: var(--sv-fg); font-weight: 650; }
+.sv-alerts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sv-al-btn { width: 100%; text-align: left; display: grid; grid-template-columns: 84px 1fr; gap: 2px 10px; align-items: baseline; background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.sv-al-btn:hover, .sv-al-btn[aria-pressed=true] { border-color: var(--sv-fg); }
+.sv-sev { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 2px 6px; grid-row: span 2; align-self: start; justify-self: start; }
+.sv-sev.is-critical { background: var(--sv-bad); color: #fff; } .sv-sev.is-high { background: var(--sv-bad-bg); color: var(--sv-bad); } .sv-sev.is-medium { background: var(--sv-warn-bg); color: var(--sv-warn); }
+.sv-al-name { font-weight: 650; font-size: 14px; }
+.sv-al-val { font-size: 12.5px; color: var(--sv-muted); font-variant-numeric: tabular-nums; }
+.sv .sv-al-val b { color: var(--sv-fg); font-weight: 650; }
+.sv-al-act { grid-column: 2; font-size: 12.5px; line-height: 1.4; }
+.sv-rules summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--sv-focus); margin-top: 10px; }
+.sv-rules table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.sv-rules th, .sv-rules td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--sv-line); }
+.sv-rules th { color: var(--sv-muted); font-weight: 600; }
+.sv-detail-panel { border: 1px solid var(--sv-line); border-radius: 12px; padding: 12px 14px; background: var(--sv-soft); font-size: 13px; line-height: 1.5; }
+.sv-detail-panel p { margin: 0 0 6px; }
+.sv-chart { position: relative; }
+.sv-chart svg { display: block; }
+.sv-chart .is-click { cursor: pointer; }
+.sv-chart .is-click:hover, .sv-chart .is-click:focus-visible { opacity: .82; outline: none; }
+.sv-chart .is-click.is-picked { stroke: var(--sv-fg); stroke-width: 2; }
+.sv-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--sv-muted); margin-top: 8px; }
+.sv-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sv-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.sv-tip { position: absolute; pointer-events: none; background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px 9px; font-size: 12px; white-space: nowrap; z-index: 3; color: var(--sv-fg); }
+.sv-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.sv-toolbar input[type=search] { flex: 1 1 220px; max-width: 320px; }
+.sv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sv-chip { font-size: 12.5px; font-weight: 550; background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.sv-chip[aria-pressed=true] { background: var(--sv-fg); color: var(--sv-bg); border-color: var(--sv-fg); }
+.sv-adv { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 10px 12px; padding: 12px; border: 1px solid var(--sv-line); border-radius: 12px; background: var(--sv-soft); margin-bottom: 10px; }
+.sv-adv label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--sv-muted); font-weight: 600; }
+.sv-active { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; min-height: 26px; font-size: 12.5px; }
+.sv-active button { font-size: 12px; background: var(--sv-soft); border: 1px solid var(--sv-line); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.sv-count { font-size: 13px; color: var(--sv-muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.sv .sv-count b { color: var(--sv-fg); }
+.sv-tablewrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.sv-tablewrap.has-drawer { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); }
+@media (max-width: 900px) { .sv-tablewrap.has-drawer { grid-template-columns: minmax(0, 1fr); } }
+.sv-tablebox { overflow: auto; border: 1px solid var(--sv-line); border-radius: 12px; max-height: 620px; }
+.sv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sv-table th { position: sticky; top: 0; background: var(--sv-card); text-align: left; border-bottom: 1px solid var(--sv-line); padding: 0; white-space: nowrap; z-index: 1; }
+.sv-table th button { width: 100%; text-align: left; background: none; border: 0; padding: 9px 10px; font-weight: 600; color: var(--sv-muted); cursor: pointer; font-size: 12px; }
+.sv-table th[aria-sort=ascending] button::after { content: " ↑"; } .sv-table th[aria-sort=descending] button::after { content: " ↓"; }
+.sv-table td { padding: 8px 10px; border-bottom: 1px solid var(--sv-line); white-space: nowrap; }
+.sv-table tr:hover td { background: var(--sv-soft); }
+.sv-table tr.is-sel td { background: var(--sv-soft); }
+.sv-idbtn { background: none; border: 0; padding: 0; color: var(--sv-focus); font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--sv-focus) 35%, transparent); text-underline-offset: 3px; }
+.sv-idbtn::after { content: " ↗"; font-size: 11px; }
+.sv-idbtn:hover { text-decoration-color: var(--sv-focus); }
+.sv-tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--sv-line); border-radius: 12px; align-self: flex-start; }
+.sv-tab { background: none; border: 0; border-radius: 9px; padding: 8px 18px; font-size: 14px; font-weight: 650; color: var(--sv-fg); cursor: pointer; }
+.sv-tab:hover { background: var(--sv-card); }
+.sv-tab[aria-selected=true] { background: var(--sv-focus); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.sv-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sv-alerts.is-locked { overflow-y: auto; align-content: start; padding-right: 2px; }
+.sv-pair { align-items: stretch; }
+.sv-pair > .sv-card { display: flex; flex-direction: column; }
+.sv-pair .sv-push { margin-top: auto; }
+.sv-calib { height: 92px; overflow-y: auto; align-content: flex-start; }
+.sv-rub { row-gap: 16px; }
+.sv-lv { row-gap: 10px; }
+.sv-view { display: flex; flex-direction: column; gap: 22px; }
+.sv-qrow { display: grid; grid-template-columns: minmax(130px, 1.4fr) repeat(4, minmax(70px, 1fr)) minmax(80px, 1fr); gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--sv-line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.sv-qrow.is-head { color: var(--sv-muted); font-size: 12px; font-weight: 600; padding-top: 0; }
+.sv-qrow small { display: block; color: var(--sv-muted); font-size: 11.5px; }
+.sv-namebtn { background: none; border: 0; padding: 0; text-align: left; color: var(--sv-focus); font-weight: 650; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--sv-focus) 35%, transparent); text-underline-offset: 3px; }
+.sv-big { font-size: 34px; font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sv-rub { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 14px; align-items: baseline; font-size: 13px; }
+.sv-rub .w { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sv-rub .m { font-size: 11.5px; color: var(--sv-muted); }
+.sv-lv { display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; font-size: 13px; line-height: 1.45; }
+.sv-calib { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sv-tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 6px; background: var(--sv-soft); color: var(--sv-fg); }
+.sv-tag.is-bad { background: var(--sv-bad-bg); color: var(--sv-bad); } .sv-tag.is-warn { background: var(--sv-warn-bg); color: var(--sv-warn); } .sv-tag.is-ok { background: var(--sv-ok-bg); color: var(--sv-ok); } .sv-tag.is-muted { color: var(--sv-muted); background: transparent; border: 1px dashed var(--sv-line); }
+.sv-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--sv-muted); }
+.sv-drawer { background: var(--sv-card); border: 1px solid var(--sv-line); border-radius: 14px; padding: 16px; box-shadow: var(--sv-shadow); align-self: start; position: sticky; top: 12px; max-height: 620px; overflow: auto; font-size: 13px; }
+.sv-drawer h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.sv-drawer h4 { margin: 14px 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--sv-muted); }
+.sv-drawer dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+.sv-drawer dt { color: var(--sv-muted); } .sv-drawer dd { margin: 0; }
+.sv-bubble { border-radius: 12px; padding: 8px 11px; margin-bottom: 6px; line-height: 1.45; }
+.sv-bubble.is-cust { background: var(--sv-soft); } .sv-bubble.is-ai { background: color-mix(in srgb, var(--sv-esc) 12%, var(--sv-card)); }
+.sv-bubble small { display: block; color: var(--sv-muted); font-size: 11px; margin-bottom: 2px; }
+.sv-drawer-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sv-barrow { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 6px 16px; align-items: center; }
+.sv-barrow + .sv-barrow { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--sv-line); }
+.sv-barlabel { font-size: 13px; font-weight: 650; }
+.sv-barlabel small { display: block; font-weight: 500; color: var(--sv-muted); font-size: 12px; margin-top: 2px; }
+.sv-takeaway { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--sv-warn-bg); color: var(--sv-fg); font-size: 13px; line-height: 1.45; }
+.sv .sv-takeaway b { color: var(--sv-warn); font-weight: 700; }
+.sv-foot { font-size: 12px; color: var(--sv-muted); margin: 0; }
+.sv-brand { display: flex; align-items: center; gap: 12px; }
+.sv-logo { width: 40px; height: 40px; flex: none; }
+.sv-kpi.is-good { border-color: var(--sv-ok); background: var(--sv-ok-bg); }
+.sv-kpi-good { font-size: 10.5px; font-weight: 700; color: var(--sv-ok); text-transform: uppercase; letter-spacing: .04em; }
+.sv-sum { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sv-sum::-webkit-details-marker { display: none; }
+.sv-sum-left { display: flex; align-items: center; gap: 10px; }
+.sv-chev { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--sv-line); display: inline-flex; align-items: center; justify-content: center; flex: none; transition: transform .2s; background: var(--sv-card); }
+.sv-chev::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--sv-fg); border-bottom: 2px solid var(--sv-fg); transform: translateY(-2px) rotate(45deg); }
+details[open] > summary .sv-chev { transform: rotate(180deg); }
+.sv-hint { font-size: 12px; font-weight: 600; color: var(--sv-focus); }
+.sv-hint .is-close { display: none; }
+details[open] > summary .sv-hint .is-open { display: none; } details[open] > summary .sv-hint .is-close { display: inline; }
+.sv-collapse > summary { margin-bottom: 0; }
+.sv-collapse[open] > summary { margin-bottom: 10px; }
+.sv-info-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 10px 28px; }
+.sv-info-list li { position: relative; padding-left: 22px; line-height: 1.5; font-size: 13px; }
+.sv-info-list li::before { content: "→"; position: absolute; left: 0; top: 0; color: var(--sv-focus); font-weight: 700; }
+.sv .sv-info-list b { font-weight: 650; }
+.sv-grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 12px; align-items: start; }
+.sv-grid3 .sv-cap { min-height: 2.9em; }
+.sv-grid3 .sv-chart { min-height: 210px; }
+.sv-grid3 #trend .sv-chart { min-height: 184px; }
+.sv-advbtn { color: var(--sv-focus); border-color: var(--sv-focus); display: inline-flex; align-items: center; gap: 6px; }
+.sv-advbtn svg { width: 14px; height: 14px; }
+.sv-advbtn .sv-chev-s { display: inline-block; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .2s; }
+.sv-advbtn[aria-expanded=true] .sv-chev-s { transform: translateY(1px) rotate(225deg); }
+.sv-advbtn[aria-expanded=true] { background: var(--sv-focus); color: #fff; }
+.sv-chip.is-crit { border-color: var(--sv-bad); color: var(--sv-bad); }
+.sv-chip.is-crit[aria-pressed=true] { background: var(--sv-bad); color: #fff; }
+.sv-table tr.is-crit td { background: var(--sv-bad-bg); }
+.sv-table tr.is-overdue td { background: var(--sv-warn-bg); }
+
+</style>
+
+<div class="sv">
+  <header class="sv-top" id="top">
+    <div class="sv-brand">
+      <svg class="sv-logo" viewBox="0 0 40 40" role="img" aria-label="AI Support Dashboard logo">
+        <defs><linearGradient id="svlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1fb5d6"/><stop offset="1" stop-color="#7b5ce6"/></linearGradient></defs>
+        <rect x="0" y="0" width="40" height="40" rx="10" fill="url(#svlg)"/>
+        <rect x="9" y="21" width="5.5" height="10" rx="2" fill="#fff" opacity=".75"/>
+        <rect x="17.25" y="15" width="5.5" height="16" rx="2" fill="#fff" opacity=".9"/>
+        <rect x="25.5" y="9" width="5.5" height="22" rx="2" fill="#fff"/>
+      </svg>
+      <div>
+        <h1 class="sv-title">AI Support Dashboard</h1>
+        <p class="sv-sub">Supervisor overview · Sample data</p>
+      </div>
+    </div>
+    <div class="sv-controls">
+      <label class="sv-field">Week <select class="sv-week" data-draw="weeks" data-source="weekly" aria-label="Week"></select></label>
+      <label class="sv-field">From <select class="sv-d1" data-draw="days1" data-source="conversations" aria-label="From day"></select></label>
+      <label class="sv-field">To <select class="sv-d2" data-draw="days2" data-source="conversations" aria-label="To day"></select></label>
+      <button class="sv-btn sv-dark" aria-pressed="false">Dark mode</button>
+    </div>
+  </header>
+
+  <details class="sv-info sv-card" id="about">
+    <summary class="sv-sum"><span class="sv-sum-left"><span class="sv-chev" aria-hidden="true"></span><span class="sv-h2" style="font-size:15px">About this data and how the numbers are defined</span></span><span class="sv-hint"><span class="is-open">Click to expand</span><span class="is-close">Click to collapse</span></span></summary>
+    <ul class="sv-info-list">
+      <li><b>Simulated data.</b> Every conversation is fictional, generated for a hiring assessment. This is a prototype, not a live system. All thresholds are illustrative, to agree with the client.</li>
+      <li><b>Filters.</b> The week drives the six numbers, the alerts and the charts. From and To narrow the conversation table to days within that week.</li>
+      <li><b>QA sample.</b> Each week, a random sample of conversations, stratified by outcome, is reviewed: <b data-draw="iv" data-col="qa_reviewed" data-fmt="count" data-source="weekly" data-field="qa_reviewed">—</b> this week. QA pass rate and right-call rate both come from this same random sample. Targeted risk audits are reported separately in Quality &amp; Audits, so they never skew the QA pass rate. Unreviewed conversations are shown as Not reviewed, never as passed.</li>
+      <li><b>QA pass rate vs right-call rate.</b> QA pass rate is pass or soft pass. Right-call rate is whether the agent correctly chose to resolve, clarify or escalate. QA rubric v1 scored the reply and penalized missed escalations, but not unnecessary ones. That's why <b data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</b> wrong calls this week still passed QA. Fixing the rubric is a calibration item.</li>
+      <li><b>Customer resolution</b> is separate from QA: a conversation can pass QA but still be pending with a person, or come back as a repeat contact.</li>
+      <li><b>SLA (illustrative).</b> A person responds within <b data-draw="iv" data-col="limit" data-fmt="min" data-source="alerts" data-field="limit" data-alert="overdue">—</b> of a handoff. Waiting past that is overdue, and counts as an SLA breach.</li>
+    </ul>
+  </details>
+
+  <div class="sv-tabs" role="tablist" aria-label="Dashboard views">
+    <button class="sv-tab" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button class="sv-tab" role="tab" data-tab="quality" aria-selected="false">Quality &amp; Audits</button>
+  </div>
+
+  <div class="sv-view" data-view="overview" role="tabpanel">
+  <section id="kpis" aria-labelledby="kpis-title">
+    <h2 class="sv-h2" id="kpis-title" style="margin-bottom:10px">This week</h2>
+    <div class="sv-kpis">
+      <button class="sv-kpi" data-kpi="resolved_rate" data-alerts="" data-go='{"outcome":"Resolved by AI"}'>
+        <span class="sv-kpi-label">Resolved by AI</span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="resolved_rate">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="resolved_rate" data-source="weekly">—</span>
+        <span class="sv-kpi-def">Handled fully by the AI, without a person.</span>
+        <span class="sv-kpi-go">View conversations</span>
+      </button>
+      <button class="sv-kpi" data-kpi="right_call_rate" data-alerts="right_call_low" data-go='{"right":"No"}'>
+        <span class="sv-kpi-label">Right-call rate <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="right_call_rate">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="right_call_rate" data-source="weekly alerts">—</span>
+        <span class="sv-kpi-def">Correctly chose to resolve, clarify or escalate, in the QA sample.</span>
+        <span class="sv-kpi-go">View wrong calls</span>
+      </button>
+      <button class="sv-kpi" data-kpi="qa_pass_rate" data-alerts="qa_low" data-go='{"qa":"Failed"}'>
+        <span class="sv-kpi-label">QA pass rate <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="qa_pass_rate">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="qa_pass_rate" data-source="weekly alerts">—</span>
+        <span class="sv-kpi-def">Pass or soft pass, in the QA sample.</span>
+        <span class="sv-kpi-go">View soft fails and fails</span>
+      </button>
+      <button class="sv-kpi" data-kpi="critical_incidents" data-alerts="critical" data-go='{"crit":"Yes"}'>
+        <span class="sv-kpi-label">Critical incidents <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="count" data-source="weekly" data-field="critical_incidents">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="critical_incidents" data-source="weekly alerts">—</span>
+        <span class="sv-kpi-def">Privacy breaches or unauthorized refunds. Any one needs immediate review.</span>
+        <span class="sv-kpi-go">View incidents</span>
+      </button>
+      <button class="sv-kpi" data-kpi="escalation_rate" data-alerts="esc_spike esc_drop" data-go='{"outcome":"Escalated"}'>
+        <span class="sv-kpi-label">Escalation rate <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="escalation_rate">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="escalation_rate" data-source="weekly">—</span>
+        <span class="sv-kpi-def">Share of conversations handed to a person.</span>
+        <span class="sv-kpi-go">View escalations</span>
+      </button>
+      <button class="sv-kpi" data-kpi="repeat_rate" data-alerts="repeat_high" data-go='{"outcome":"Resolved by AI","repeat":"Yes"}'>
+        <span class="sv-kpi-label">Repeat contacts <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
+        <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="repeat_rate">—</span>
+        <span class="sv-kpi-cmp" data-draw="kc" data-kpi="repeat_rate" data-source="weekly alerts">—</span>
+        <span class="sv-kpi-def">AI-resolved conversations where the customer came back about the same issue.</span>
+        <span class="sv-kpi-go">View repeat contacts</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="sv-grid2">
+    <details class="sv-card sv-collapse" id="alerts" open>
+      <summary class="sv-sum"><h2 class="sv-h2" id="alerts-title">Alerts &amp; actions</h2><span class="sv-chev" aria-hidden="true"></span></summary>
+      <p class="sv-cap">Only triggered alerts are shown. Select one to filter the conversations below.</p>
+      <span class="sv-alertvis" data-draw="alertvis" data-source="alerts"></span>
+      <ul class="sv-alerts">
+        <li data-alert="critical" hidden><button class="sv-al-btn" data-alert="critical"><span class="sv-sev is-critical">Critical</span><span class="sv-al-name">Critical incident</span><span class="sv-al-val">Now <b data-draw="av" data-alert="critical" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="critical" data-col="limit" data-fmt="count" data-source="alerts" data-field="limit">—</b> or more</span><span class="sv-al-act">Immediate review, regardless of escalation rate or overall QA score.</span></button></li>
+        <li data-alert="overdue" hidden><button class="sv-al-btn" data-alert="overdue"><span class="sv-sev is-high">High</span><span class="sv-al-name">Overdue handoffs</span><span class="sv-al-val">Now <b data-draw="av" data-alert="overdue" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</b> waiting past <b data-draw="av" data-alert="overdue" data-col="limit" data-fmt="min" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Assign each one now and update the customer.</span></button></li>
+        <li data-alert="esc_spike" hidden><button class="sv-al-btn" data-alert="esc_spike"><span class="sv-sev is-high">High</span><span class="sv-al-name">Escalations increased sharply</span><span class="sv-al-val">Now <b data-draw="av" data-alert="esc_spike" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="esc_spike" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b>, well above the recent average</span><span class="sv-al-act">Check customer issue types, recent policy changes, system errors, and whether the human queue can handle the volume.</span></button></li>
+        <li data-alert="esc_drop" hidden><button class="sv-al-btn" data-alert="esc_drop"><span class="sv-sev is-high">High</span><span class="sv-al-name">Escalations dropped sharply</span><span class="sv-al-val">Now <b data-draw="av" data-alert="esc_drop" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="esc_drop" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b>, well below the recent average</span><span class="sv-al-act">Review AI-handled conversations for missed escalations, unauthorized actions, and changes to the agent's instructions.</span></button></li>
+        <li data-alert="sla_breach" hidden><button class="sv-al-btn" data-alert="sla_breach"><span class="sv-sev is-high">High</span><span class="sv-al-name">SLA breaches</span><span class="sv-al-val">Now <b data-draw="av" data-alert="sla_breach" data-col="value" data-fmt="pct1" data-source="alerts" data-field="value">—</b> of handoffs · threshold <b data-draw="av" data-alert="sla_breach" data-col="limit" data-fmt="pct1" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Check queue staffing for the busiest time slots, and whether the extra escalations are swamping the team.</span></button></li>
+        <li data-alert="right_call_low" hidden><button class="sv-al-btn" data-alert="right_call_low"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">Right-call rate below target</span><span class="sv-al-val">Now <b data-draw="av" data-alert="right_call_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · target <b data-draw="av" data-alert="right_call_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Review the wrong calls in both escalated and AI-handled conversations, then calibrate.</span></button></li>
+        <li data-alert="qa_low" hidden><button class="sv-al-btn" data-alert="qa_low"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">QA pass rate below target</span><span class="sv-al-val">Now <b data-draw="av" data-alert="qa_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · target <b data-draw="av" data-alert="qa_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Review the soft fails and fails, find the cause, then calibrate.</span></button></li>
+        <li data-alert="repeat_high" hidden><button class="sv-al-btn" data-alert="repeat_high"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">Repeat contacts rising</span><span class="sv-al-val">Now <b data-draw="av" data-alert="repeat_high" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · limit <b data-draw="av" data-alert="repeat_high" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Check whether conversations marked resolved were really solved.</span></button></li>
+        <li data-alert="none" hidden><p class="sv-cap" style="margin:0">No alerts are triggered this week.</p></li>
+      </ul>
+
+      <div class="sv-detail-panel" id="alert-detail" hidden style="margin-top:10px">
+        <p><b>Filtered below:</b> <span data-draw="matchcount" data-source="conversations">—</span>. <button class="sv-link sv-clear-alert">Clear</button></p>
+        <p data-alert-note="critical" hidden>Shows the critical incident. Contain it first, then fix the instructions that allowed it.</p>
+        <p data-alert-note="overdue" hidden>Shows handoffs still waiting past the SLA. Each needs an owner now.</p>
+        <p data-alert-note="esc_spike" hidden>Shows all escalations. Use the reasons chart to see which kind grew.</p>
+        <p data-alert-note="esc_drop" hidden>Shows AI-handled conversations. Check the reviewed ones for missed escalations.</p>
+        <p data-alert-note="sla_breach" hidden>Shows handoffs that breached the SLA, including overdue ones.</p>
+        <p data-alert-note="right_call_low" hidden>Shows reviewed conversations where the decision was wrong.</p>
+        <p data-alert-note="qa_low" hidden>Shows reviewed conversations that soft-failed or failed.</p>
+        <p data-alert-note="repeat_high" hidden>Shows AI-resolved conversations where the customer came back.</p>
+      </div>
+
+      <details class="sv-rules">
+        <summary>All alert rules</summary>
+        <table>
+          <thead><tr><th>Alert</th><th>Threshold</th><th>This week</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Critical incident</td><td><span data-draw="av" data-alert="critical" data-col="limit" data-fmt="count" data-source="alerts" data-field="limit">—</span> or more</td><td data-draw="av" data-alert="critical" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="critical" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>Overdue handoffs</td><td>Any past <span data-draw="av" data-alert="overdue" data-col="limit" data-fmt="min" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="overdue" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="overdue" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>Escalation spike</td><td>Above <span data-draw="av" data-alert="esc_spike" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="esc_spike" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="esc_spike" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>Escalation drop</td><td>Below <span data-draw="av" data-alert="esc_drop" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="esc_drop" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="esc_drop" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>SLA breaches</td><td>Above <span data-draw="av" data-alert="sla_breach" data-col="limit" data-fmt="pct1" data-source="alerts" data-field="limit">—</span> of handoffs</td><td data-draw="av" data-alert="sla_breach" data-col="value" data-fmt="pct1" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="sla_breach" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>Right-call rate</td><td>Below <span data-draw="av" data-alert="right_call_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="right_call_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="right_call_low" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>QA pass rate</td><td>Below <span data-draw="av" data-alert="qa_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="qa_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="qa_low" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+            <tr><td>Repeat contacts</td><td>Above <span data-draw="av" data-alert="repeat_high" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</span></td><td data-draw="av" data-alert="repeat_high" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</td><td data-draw="av" data-alert="repeat_high" data-col="status" data-source="alerts" data-field="status">—</td></tr>
+          </tbody>
+        </table>
+        <p class="sv-cap" style="margin-top:8px">All thresholds are illustrative. Escalation spike and drop compare with the average of the previous weeks shown in the trend.</p>
+      </details>
+    </details>
+
+<div class="sv-col">
+      <details class="sv-card sv-collapse" id="where" open>
+      <summary class="sv-sum"><h2 class="sv-h2" id="where-title">Where conversations went</h2><span class="sv-chev" aria-hidden="true"></span></summary>
+      <p class="sv-cap">Two different groups: every conversation this week, and the escalations reviewed in the QA sample. Select a segment to filter the conversations.</p>
+      <div class="sv-barrow">
+        <div class="sv-barlabel">All conversations<small><span data-draw="iv" data-col="total" data-fmt="count" data-source="weekly" data-field="total">—</span> this week · full population</small></div>
+        <div class="sv-chart" data-draw="split" data-which="all" data-source="weekly"></div>
+      </div>
+      <div class="sv-barrow">
+        <div class="sv-barlabel">QA-reviewed escalations<small><span data-draw="iv" data-col="esc_reviewed" data-fmt="count" data-source="weekly" data-field="esc_reviewed">—</span> reviewed · sample only</small></div>
+        <div class="sv-chart" data-draw="split" data-which="reviewed" data-source="weekly"></div>
+      </div>
+      <div class="sv-legend"><span><i style="background:var(--sv-ai)"></i>AI-handled</span><span><i style="background:var(--sv-esc)"></i>Escalated</span><span><i style="background:var(--sv-esc-soft)"></i>Needed a person</span><span><i style="background:var(--sv-warn)"></i>Didn't need one</span></div>
+      <p class="sv-takeaway"><b data-draw="iv" data-col="esc_not_needed_rate" data-fmt="pct" data-source="weekly" data-field="esc_not_needed_rate">—</b> of reviewed escalations (<span data-draw="iv" data-col="esc_not_needed" data-fmt="count" data-source="weekly" data-field="esc_not_needed">—</span> of <span data-draw="iv" data-col="esc_reviewed" data-fmt="count" data-source="weekly" data-field="esc_reviewed">—</span>) didn't need a person, so they may have been unnecessary. That points to the agent playing it too safe, not to QA failing.</p>
+    </details>
+      <details class="sv-card sv-collapse" id="handoffs" open>
+        <summary class="sv-sum"><h2 class="sv-h2" id="handoff-title">Handoff queue</h2><span class="sv-chev" aria-hidden="true"></span></summary>
+        <p class="sv-cap">What happened to this week's handoffs to a person. Select a segment to filter the conversations.</p>
+        <div class="sv-strip">
+          <span>Handoffs <b data-draw="iv" data-col="escalated" data-fmt="count" data-source="weekly" data-field="escalated">—</b></span>
+          <span>Waiting <b data-draw="iv" data-col="waiting" data-fmt="count" data-source="weekly" data-field="waiting">—</b></span>
+          <span>Overdue <b data-draw="iv" data-col="overdue" data-fmt="count" data-source="weekly" data-field="overdue">—</b></span>
+          <span>SLA breaches <b data-draw="iv" data-col="sla_breached" data-fmt="count" data-source="weekly" data-field="sla_breached">—</b> (<span data-draw="iv" data-col="sla_breach_rate" data-fmt="pct1" data-source="weekly" data-field="sla_breach_rate">—</span> of handoffs)</span>
+        </div>
+        <div class="sv-chart" data-draw="handoffbar" data-source="weekly"></div>
+        <div class="sv-legend" data-draw="handofflegend" data-source="weekly"></div>
+      </details>
+    </div>
+  </div>
+
+  <section aria-labelledby="behind-title">
+    <h2 class="sv-h2" id="behind-title">Behind the numbers</h2>
+    <p class="sv-cap">Select a bar or a week to filter. Red is used only for problems.</p>
+    <div class="sv-grid3">
+      <details class="sv-card sv-collapse" id="reasons" open>
+        <summary class="sv-sum"><h3 class="sv-h2" style="font-size:15px">Why the AI escalated</h3><span class="sv-chev" aria-hidden="true"></span></summary>
+        <p class="sv-cap">All escalations this week by reason. The amber part is reviewed escalations that didn't need a person.</p>
+        <div class="sv-chart" data-draw="reasons" data-source="reasons"></div>
+      </details>
+      <details class="sv-card sv-collapse" id="levels" open>
+        <summary class="sv-sum"><h3 class="sv-h2" style="font-size:15px">QA results</h3><span class="sv-chev" aria-hidden="true"></span></summary>
+        <p class="sv-cap">The QA sample by level. Conversations outside the sample are Not reviewed.</p>
+        <div class="sv-chart" data-draw="levels" data-source="level_mix"></div>
+      </details>
+      <details class="sv-card sv-collapse" id="trend" open>
+        <summary class="sv-sum"><h3 class="sv-h2" style="font-size:15px">Eight-week trend</h3><span class="sv-chev" aria-hidden="true"></span></summary>
+        <p class="sv-cap">Select a week to see it everywhere on the page.</p>
+        <div class="sv-chart" data-draw="trend" data-source="weekly"></div>
+        <div class="sv-legend"><span><i style="background:var(--sv-esc)"></i>Escalation rate</span><span><i style="background:var(--sv-ai)"></i>QA pass rate</span><span><i style="background:var(--sv-warn)"></i>Right-call rate</span></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="sv-card" id="conversations" aria-labelledby="conv-title">
+    <h2 class="sv-h2" id="conv-title">Conversations</h2>
+    <p class="sv-cap">Combine filters, sort by any column, and select a conversation ID for details.</p>
+    <div class="sv-toolbar">
+      <input class="sv-q" type="search" placeholder="Search ID, topic, reason…" aria-label="Search conversations">
+      <div class="sv-chips" role="group" aria-label="Quick filters">
+        <button class="sv-chip is-crit" data-quick='{"crit":"Yes"}'>Critical</button>
+        <button class="sv-chip" data-quick='{"right":"No"}'>Wrong call</button>
+        <button class="sv-chip" data-quick='{"qa":"Failed"}'>QA soft fail or fail</button>
+        <button class="sv-chip" data-quick='{"sla":"Breached"}'>SLA breached</button>
+        <button class="sv-chip" data-quick='{"handoff":"Overdue"}'>Overdue</button>
+        <button class="sv-chip" data-quick='{"repeat":"Yes"}'>Repeat contact</button>
+      </div>
+      <button class="sv-btn sv-advbtn" aria-expanded="false" aria-controls="adv"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>More filters<span data-draw="advcount" data-source="conversations"></span><span class="sv-chev-s" aria-hidden="true"></span></button>
+      <button class="sv-btn sv-export" hidden>Export CSV</button>
+    </div>
+    <div class="sv-adv" id="adv" hidden>
+      <label>Topic <select data-draw="opts" data-col="topic" data-param="topic" data-source="conversations"></select></label>
+      <label>Language <select data-draw="opts" data-col="language" data-param="lang" data-source="conversations"></select></label>
+      <label>Outcome <select data-draw="opts" data-col="outcome" data-param="outcome" data-source="conversations"></select></label>
+      <label>Escalation reason <select data-draw="opts" data-col="escalation_reason" data-param="reason" data-source="conversations"></select></label>
+      <label>Handed to a person <select data-draw="opts" data-col="handed_to_person" data-param="handed" data-source="conversations"></select></label>
+      <label>Handoff status <select data-draw="opts" data-col="handoff_status" data-param="handoff" data-source="conversations"></select></label>
+      <label>SLA <select data-draw="opts" data-col="sla_status" data-param="sla" data-source="conversations"></select></label>
+      <label>QA level <select data-draw="opts" data-col="qa_level" data-param="qa" data-source="conversations"></select></label>
+      <label>Right call <select data-draw="opts" data-col="right_call" data-param="right" data-source="conversations"></select></label>
+      <label>Repeat contact <select data-draw="opts" data-col="repeat_contact" data-param="repeat" data-source="conversations"></select></label>
+      <label>Critical incident <select data-draw="opts" data-col="critical_incident" data-param="crit" data-source="conversations"></select></label>
+      <label>Customer resolved <select data-draw="opts" data-col="customer_resolved" data-param="resolved" data-source="conversations"></select></label>
+      <label>Review type <select data-draw="opts" data-col="review_type" data-param="rtype" data-source="conversations"></select></label>
+      <label>Reviewed by <select data-draw="opts" data-col="qa_reviewer" data-param="reviewer" data-source="conversations"></select></label>
+      <label>Audit finding <select data-draw="opts" data-col="audit_finding" data-param="finding" data-source="conversations"></select></label>
+    </div>
+    <div class="sv-active"><span data-draw="active" data-source="conversations"></span><button class="sv-link sv-clearall">Clear all filters</button><span class="sv-count" data-draw="count" data-source="conversations">—</span></div>
+    <div class="sv-tablewrap">
+      <div>
+        <div class="sv-tablebox">
+          <table class="sv-table" data-source="conversations" data-row-key="conversation_id">
+            <thead><tr>
+              <th data-field="conversation_id" data-sort="conversation_id"><button>ID</button></th>
+              <th data-field="day" data-sort="day"><button>Day</button></th>
+              <th data-field="topic" data-sort="topic"><button>Topic</button></th>
+              <th data-field="language" data-sort="language"><button>Language</button></th>
+              <th data-field="outcome" data-sort="outcome"><button>Outcome</button></th>
+              <th data-field="escalation_reason" data-sort="escalation_reason"><button>Escalation reason</button></th>
+              <th data-field="handoff_status" data-sort="handoff_status"><button>Handoff</button></th>
+              <th data-field="sla_status" data-sort="sla_status"><button>SLA</button></th>
+              <th data-field="qa_level" data-sort="qa_level"><button>QA</button></th>
+              <th data-field="right_call" data-sort="right_call"><button>Right call</button></th>
+              <th data-field="repeat_contact" data-sort="repeat_contact"><button>Repeat</button></th>
+              <th data-field="critical_incident" data-sort="critical_incident"><button>Critical</button></th>
+            </tr></thead>
+            <tbody data-draw="rows" data-source="conversations"></tbody>
+          </table>
+        </div>
+        <div class="sv-pager"><button class="sv-btn sv-prev">Previous</button><span data-draw="pageinfo" data-source="conversations">—</span><button class="sv-btn sv-next">Next</button></div>
+      </div>
+      <aside class="sv-drawer" id="drawer" hidden aria-labelledby="drawer-title">
+        <div class="sv-drawer-top"><h3 id="drawer-title" data-draw="dv" data-col="conversation_id" data-source="conversations" data-field="conversation_id">—</h3><button class="sv-btn sv-close">Close</button></div>
+        <dl style="margin-top:8px">
+          <dt>When</dt><dd><span data-draw="dv" data-col="day" data-source="conversations" data-field="day">—</span> at <span data-draw="dv" data-col="time" data-source="conversations" data-field="time">—</span></dd>
+          <dt>Topic</dt><dd data-draw="dv" data-col="topic" data-source="conversations" data-field="topic">—</dd>
+          <dt>Language</dt><dd data-draw="dv" data-col="language" data-source="conversations" data-field="language">—</dd>
+        </dl>
+        <h4>Conversation (fictional)</h4>
+        <div class="sv-bubble is-cust"><small>Customer</small><span data-draw="tv" data-ref="msg_id" data-source="templates" data-field="text">—</span></div>
+        <div class="sv-bubble is-ai"><small>AI agent</small><span data-draw="tv" data-ref="reply_id" data-source="templates" data-field="text">—</span></div>
+        <h4>AI decision</h4>
+        <p style="margin:0" data-draw="tv" data-ref="decision_id" data-source="templates" data-field="text">—</p>
+        <h4>QA</h4>
+        <dl>
+          <dt>Level</dt><dd data-draw="dv" data-col="qa_level" data-source="conversations" data-field="qa_level">—</dd>
+          <dt>Right call</dt><dd data-draw="dv" data-col="right_call" data-source="conversations" data-field="right_call">—</dd>
+          <dt>Reasoning</dt><dd data-draw="tv" data-ref="note_id" data-source="templates" data-field="text">—</dd>
+        </dl>
+        <h4>Review</h4>
+        <dl>
+          <dt>Review type</dt><dd data-draw="dv" data-col="review_type" data-source="conversations" data-field="review_type">—</dd>
+          <dt>Reviewed by</dt><dd data-draw="dv" data-col="qa_reviewer" data-source="conversations" data-field="qa_reviewer">—</dd>
+          <dt>Review date</dt><dd data-draw="dv" data-col="review_date" data-source="conversations" data-field="review_date">—</dd>
+          <dt>Audit finding</dt><dd data-draw="dv" data-col="audit_finding" data-source="conversations" data-field="audit_finding">—</dd>
+          <dt>Second-scored by</dt><dd data-draw="dv" data-col="second_reviewer" data-source="conversations" data-field="second_reviewer">—</dd>
+          <dt>Second level</dt><dd data-draw="dv" data-col="second_level" data-source="conversations" data-field="second_level">—</dd>
+          <dt>Calibration</dt><dd data-draw="dv" data-col="calibration" data-source="conversations" data-field="calibration">—</dd>
+        </dl>
+        <h4>Escalation and handoff</h4>
+        <dl>
+          <dt>Reason</dt><dd data-draw="dv" data-col="escalation_reason" data-source="conversations" data-field="escalation_reason">—</dd>
+          <dt>Handed to a person</dt><dd data-draw="dv" data-col="handed_to_person" data-source="conversations" data-field="handed_to_person">—</dd>
+          <dt>Handoff status</dt><dd data-draw="dv" data-col="handoff_status" data-source="conversations" data-field="handoff_status">—</dd>
+          <dt>First response</dt><dd data-draw="dv" data-col="first_response_min" data-source="conversations" data-field="first_response_min">—</dd>
+          <dt>SLA</dt><dd data-draw="dv" data-col="sla_status" data-source="conversations" data-field="sla_status">—</dd>
+          <dt>Customer resolved</dt><dd data-draw="dv" data-col="customer_resolved" data-source="conversations" data-field="customer_resolved">—</dd>
+          <dt>Repeat contact</dt><dd data-draw="dv" data-col="repeat_contact" data-source="conversations" data-field="repeat_contact">—</dd>
+        </dl>
+        <h4>Recommended next step</h4>
+        <p style="margin:0" data-draw="tv" data-ref="step_id" data-source="templates" data-field="text">—</p>
+      </aside>
+    </div>
+  </section>
+
+  </div>
+
+  <div class="sv-view" data-view="quality" role="tabpanel" hidden>
+    <div class="sv-grid2 sv-pair">
+      <section class="sv-card" id="composition" aria-labelledby="comp-title">
+        <h2 class="sv-h2" id="comp-title">Sample composition</h2>
+        <p class="sv-cap">What was reviewed this week, and how. QA pass rate and right-call rate use the random sample only. Targeted audits are reported separately, so they never skew the QA pass rate. Select a segment to see those conversations.</p>
+        <div class="sv-chart" data-draw="comp" data-source="reviews"></div>
+        <div class="sv-legend"><span><i style="background:var(--sv-ai)"></i>Random sample (QA-scored)</span><span><i style="background:var(--sv-esc-soft)"></i>Targeted risk audit</span><span><i style="background:var(--sv-soft); border:1px dashed var(--sv-muted)"></i>Not reviewed</span></div>
+        <div class="sv-barrow" style="margin-top:14px">
+          <div class="sv-barlabel">Random sample by outcome<small>Stratified: same split as the full week</small></div>
+          <div class="sv-chart" data-draw="qbar" data-which="outcome" data-source="reviews"></div>
+        </div>
+        <div class="sv-barrow">
+          <div class="sv-barlabel">Targeted audit findings<small>Risk cases outside the random sample</small></div>
+          <div class="sv-chart" data-draw="qbar" data-which="findings" data-source="reviews"></div>
+        </div>
+        <div class="sv-strip sv-push" style="margin:14px 0 0">
+          <span>Random sample <b data-draw="rv" data-col="random" data-fmt="count" data-source="reviews" data-field="random">—</b> (<span data-draw="rv" data-col="random_rate" data-fmt="pct" data-source="reviews" data-field="random_rate">—</span>)</span>
+          <span>Targeted audits <b data-draw="rv" data-col="targeted" data-fmt="count" data-source="reviews" data-field="targeted">—</b></span>
+          <span>Security or sensitive info <b data-draw="rv" data-col="targeted_security" data-fmt="count" data-source="reviews" data-field="targeted_security">—</b></span>
+          <span>SLA breach or overdue <b data-draw="rv" data-col="targeted_sla" data-fmt="count" data-source="reviews" data-field="targeted_sla">—</b></span>
+          <span>Issues found <b data-draw="rv" data-col="audit_issues" data-fmt="count" data-source="reviews" data-field="audit_issues">—</b></span>
+        </div>
+      </section>
+
+      <section class="sv-card" id="calibration" aria-labelledby="cal-title">
+        <h2 class="sv-h2" id="cal-title">Calibration score</h2>
+        <div class="sv-big" style="margin:6px 0 4px" data-draw="rv" data-col="agreement_rate" data-fmt="pct" data-source="reviews" data-field="agreement_rate">—</div>
+        <p class="sv-cap">The QA lead second-scores part of the random sample each week. The score is how often both reviewers gave the same level.</p>
+        <p class="sv-cap" style="min-height:0"><span data-draw="rv" data-col="agreed" data-fmt="count" data-source="reviews" data-field="agreed">—</span> of <span data-draw="rv" data-col="double_scored" data-fmt="count" data-source="reviews" data-field="double_scored">—</span> double-scored conversations agreed. Disagreements this week, to discuss in calibration:</p>
+        <div class="sv-calib" data-draw="disagree" data-source="conversations"></div>
+        <div class="sv-chart sv-push" data-draw="agreetrend" data-source="reviews" style="padding-top:12px"></div>
+      </section>
+    </div>
+
+    <section class="sv-card" id="volume" aria-labelledby="vol-title">
+      <h2 class="sv-h2" id="vol-title">QA volume by reviewer</h2>
+      <p class="sv-cap">This week's reviews by person. Select a name to see their reviews in the conversation table.</p>
+      <div class="sv-qrow is-head"><span>Reviewer</span><span>Random sample</span><span>Targeted audits</span><span>Second-scored</span><span>Total</span><span>QA pass rate given</span></div>
+      <div data-draw="volume" data-source="reviewer_volume rubric"></div>
+    </section>
+
+    <div class="sv-grid2 sv-pair">
+      <section class="sv-card" id="rubric" aria-labelledby="rub-title">
+        <h2 class="sv-h2" id="rub-title">The QA rubric</h2>
+        <p class="sv-cap">Each conversation in the random sample is checked on four parts. Mapped from Snappr: Integrity became Accuracy and policy, Aesthetics became Communication. Resolution and Judgment are new, because conversations have outcomes. Weights are illustrative, not yet agreed with a client.</p>
+        <div class="sv-rub" data-draw="rubric" data-source="rubric"></div>
+      </section>
+      <section class="sv-card" id="levels-def" aria-labelledby="lv-title">
+        <h2 class="sv-h2" id="lv-title">The levels</h2>
+        <p class="sv-cap">The level comes from the most serious problem found. A critical incident is always a critical failure.</p>
+        <div class="sv-lv" data-draw="leveldefs" data-source="rubric"></div>
+      </section>
+    </div>
+  </div>
+
+  <p class="sv-foot">Prepared by Jeannie Demir · Prototype for a hiring assessment · All conversations, numbers and thresholds are simulated.</p>
+</div>
+
+<script>
+  // ---------- calculations (readers can see each one in Sources) ----------
+  dash.calc('weekly', {
+    title: 'Weekly numbers',
+    description: 'Every headline number per week, counted from the simulated conversations.',
+    inputs: ['conversations'],
+    fn: (conversations) => {
+      const weeks = d3.groups(conversations, (c) => c.week_start).sort((a, b) => a[0] < b[0] ? -1 : 1);
+      const out = weeks.map(([week_start, rows]) => {
+        const total = rows.length;
+        const escalated = rows.filter((c) => c.outcome === 'Escalated').length;
+        const resolved = total - escalated;
+        const sample = rows.filter((c) => c.qa_reviewed === 'Yes');
+        const passed = sample.filter((c) => c.qa_level === 'Pass' || c.qa_level === 'Soft pass').length;
+        const right = sample.filter((c) => c.right_call === 'Yes').length;
+        const escSample = sample.filter((c) => c.outcome === 'Escalated');
+        const notNeeded = escSample.filter((c) => c.right_call === 'No').length;
+        const repeat = rows.filter((c) => c.outcome === 'Resolved by AI' && c.repeat_contact === 'Yes').length;
+        const breached = rows.filter((c) => c.sla_status === 'Breached').length;
+        return {
+          week_start, total, resolved, escalated,
+          resolved_rate: resolved / total, escalation_rate: escalated / total,
+          qa_reviewed: sample.length, qa_passed: passed, qa_pass_rate: passed / sample.length,
+          right_calls: right, wrong_calls: sample.length - right, right_call_rate: right / sample.length,
+          wrong_but_passed: sample.filter((c) => c.right_call === 'No' && (c.qa_level === 'Pass' || c.qa_level === 'Soft pass')).length,
+          esc_reviewed: escSample.length, esc_not_needed: notNeeded, esc_needed: escSample.length - notNeeded,
+          esc_not_needed_rate: escSample.length ? notNeeded / escSample.length : null,
+          critical_incidents: rows.filter((c) => c.critical_incident === 'Yes').length,
+          repeat_contacts: repeat, repeat_rate: repeat / resolved,
+          waiting: rows.filter((c) => c.handoff_status === 'Waiting').length,
+          picked_on_time: rows.filter((c) => c.handoff_status === 'Picked up' && c.sla_status === 'Met').length,
+          picked_late: rows.filter((c) => c.handoff_status === 'Picked up' && c.sla_status === 'Breached').length,
+          overdue: rows.filter((c) => c.handoff_status === 'Overdue').length,
+          sla_breached: breached, sla_breach_rate: escalated ? breached / escalated : 0,
+        };
+      });
+      out.forEach((w, i) => {
+        const prev = out.slice(Math.max(0, i - 4), i);
+        w.prior_weeks = prev.length;
+        w.avg_escalation_rate = prev.length ? d3.sum(prev, (p) => p.escalated) / d3.sum(prev, (p) => p.total) : null;
+        w.prev_resolved_rate = i ? out[i - 1].resolved_rate : null;
+        w.prev_critical = i ? out[i - 1].critical_incidents : null;
+      });
+      return out;
+    },
+  });
+
+  dash.calc('alerts', {
+    title: 'Alert checks',
+    description: 'Each week\u2019s alert checks against illustrative thresholds.',
+    inputs: ['weekly'],
+    fn: (weekly) => weekly.flatMap((w) => {
+      const st = (b) => b ? 'Triggered' : 'OK';
+      const base = w.avg_escalation_rate;
+      const rows = [
+        { alert: 'critical', severity: 'Critical', value: w.critical_incidents, limit: 1, status: st(w.critical_incidents >= 1) },
+        { alert: 'overdue', severity: 'High', value: w.overdue, limit: 120, status: st(w.overdue > 0) },
+        { alert: 'esc_spike', severity: 'High', value: w.escalation_rate, limit: base == null ? null : base * 1.5, status: base == null ? 'No baseline' : st(w.escalation_rate > base * 1.5) },
+        { alert: 'esc_drop', severity: 'High', value: w.escalation_rate, limit: base == null ? null : base * 0.5, status: base == null ? 'No baseline' : st(w.escalation_rate < base * 0.5) },
+        { alert: 'sla_breach', severity: 'High', value: w.sla_breach_rate, limit: 0.05, status: st(w.sla_breach_rate > 0.05) },
+        { alert: 'right_call_low', severity: 'Medium', value: w.right_call_rate, limit: 0.85, status: st(w.right_call_rate < 0.85) },
+        { alert: 'qa_low', severity: 'Medium', value: w.qa_pass_rate, limit: 0.9, status: st(w.qa_pass_rate < 0.9) },
+        { alert: 'repeat_high', severity: 'Medium', value: w.repeat_rate, limit: 0.1, status: st(w.repeat_rate > 0.1) },
+      ];
+      return rows.map((r) => ({ week_start: w.week_start, ...r }));
+    }),
+  });
+
+  dash.calc('reviews', {
+    title: 'Review coverage',
+    description: 'Per week: the random QA sample, targeted risk audits, and calibration agreement on double-scored conversations.',
+    inputs: ['conversations'],
+    fn: (conversations) => d3.groups(conversations, (c) => c.week_start).map(([week_start, rows]) => {
+      const rnd = rows.filter((c) => c.review_type === 'Random sample');
+      const tgt = rows.filter((c) => c.review_type === 'Targeted audit');
+      const dbl = rows.filter((c) => c.calibration === 'Agreed' || c.calibration === 'Disagreed');
+      const agreed = dbl.filter((c) => c.calibration === 'Agreed').length;
+      return {
+        week_start, total: rows.length,
+        random: rnd.length, random_rate: rnd.length / rows.length,
+        random_ai: rnd.filter((c) => c.outcome === 'Resolved by AI').length,
+        random_esc: rnd.filter((c) => c.outcome === 'Escalated').length,
+        targeted: tgt.length,
+        targeted_security: tgt.filter((c) => c.escalation_reason === 'Security or fraud' || c.escalation_reason === 'Sensitive information').length,
+        targeted_sla: tgt.filter((c) => c.sla_status === 'Breached' || c.handoff_status === 'Overdue').length,
+        audit_issues: tgt.filter((c) => c.audit_finding.startsWith('Issue')).length,
+        audit_ok: tgt.filter((c) => c.audit_finding === 'No issue').length,
+        audit_late: tgt.filter((c) => c.audit_finding === 'Issue found: late pickup').length,
+        audit_other: tgt.filter((c) => c.audit_finding === 'Issue found').length,
+        not_reviewed: rows.filter((c) => c.review_type === 'Not reviewed').length,
+        double_scored: dbl.length, agreed, agreement_rate: dbl.length ? agreed / dbl.length : null,
+      };
+    }).sort((a, b) => a.week_start < b.week_start ? -1 : 1),
+  });
+
+  dash.calc('reviewer_volume', {
+    title: 'Reviews by reviewer',
+    description: 'Per week and reviewer: random-sample reviews, targeted audits, second-scoring, and the QA pass rate they gave.',
+    inputs: ['conversations'],
+    fn: (conversations) => {
+      const out = [];
+      d3.groups(conversations, (c) => c.week_start).forEach(([week_start, rows]) => {
+        const names = Array.from(new Set(rows.flatMap((c) => [c.qa_reviewer, c.second_reviewer]).filter(Boolean))).sort();
+        names.forEach((reviewer) => {
+          const rnd = rows.filter((c) => c.review_type === 'Random sample' && c.qa_reviewer === reviewer);
+          const tgt = rows.filter((c) => c.review_type === 'Targeted audit' && c.qa_reviewer === reviewer).length;
+          const second = rows.filter((c) => c.second_reviewer === reviewer).length;
+          const passed = rnd.filter((c) => c.qa_level === 'Pass' || c.qa_level === 'Soft pass').length;
+          out.push({ week_start, reviewer, random: rnd.length, targeted: tgt, second_scored: second, total: rnd.length + tgt + second, pass_rate_given: rnd.length ? passed / rnd.length : null });
+        });
+      });
+      return out;
+    },
+  });
+
+  dash.calc('level_mix', {
+    title: 'QA results by level',
+    description: 'Conversations per week by QA level, including Not reviewed.',
+    inputs: ['conversations'],
+    fn: (conversations) => d3.rollups(conversations, (v) => v.length, (c) => c.week_start, (c) => c.qa_level)
+      .flatMap(([week_start, levels]) => levels.map(([level, count]) => ({ week_start, level, count }))),
+  });
+
+  dash.calc('reasons', {
+    title: 'Escalation reasons',
+    description: 'Escalations per week by reason, with reviewed ones that didn\u2019t need a person.',
+    inputs: ['conversations'],
+    fn: (conversations) => d3.rollups(conversations.filter((c) => c.outcome === 'Escalated'), (v) => ({
+      count: v.length,
+      reviewed: v.filter((c) => c.qa_reviewed === 'Yes').length,
+      not_needed: v.filter((c) => c.qa_reviewed === 'Yes' && c.right_call === 'No').length,
+    }), (c) => c.week_start, (c) => c.escalation_reason)
+      .flatMap(([week_start, rs]) => rs.map(([reason, s]) => ({ week_start, reason, ...s }))),
+  });
+
+  // ---------- shared helpers ----------
+  const SV = window.SV = {};
+  SV.FILTERS = ['d1', 'd2', 'topic', 'lang', 'outcome', 'reason', 'handed', 'handoff', 'sla', 'qa', 'right', 'repeat', 'crit', 'resolved', 'rtype', 'reviewer', 'finding', 'q'];
+  SV.COL = { topic: 'topic', lang: 'language', outcome: 'outcome', reason: 'escalation_reason', handed: 'handed_to_person', handoff: 'handoff_status', sla: 'sla_status', qa: 'qa_level', right: 'right_call', repeat: 'repeat_contact', crit: 'critical_incident', resolved: 'customer_resolved', rtype: 'review_type', reviewer: 'qa_reviewer', finding: 'audit_finding' };
+  SV.LABEL = { d1: 'From', d2: 'To', topic: 'Topic', lang: 'Language', outcome: 'Outcome', reason: 'Reason', handed: 'Handed to a person', handoff: 'Handoff', sla: 'SLA', qa: 'QA', right: 'Right call', repeat: 'Repeat', crit: 'Critical', resolved: 'Customer resolved', rtype: 'Review type', reviewer: 'Reviewed by', finding: 'Audit finding', q: 'Search' };
+  SV.PAGE = 25;
+  SV.fmt = {
+    pct: (v) => v == null || isNaN(v) ? '—' : d3.format('.0%')(v),
+    pct1: (v) => v == null || isNaN(v) ? '—' : d3.format('.1%')(v),
+    count: (v) => v == null || isNaN(v) ? '—' : d3.format(',')(v),
+    min: (v) => v == null || isNaN(v) ? '—' : d3.format(',')(v) + ' min',
+    day: (v) => v ? d3.utcFormat('%a %b %-d')(new Date(v + 'T00:00:00Z')) : '—',
+    week: (v) => v ? 'Week of ' + d3.utcFormat('%b %-d')(new Date(v + 'T00:00:00Z')) : '—',
+  };
+  SV.week = () => {
+    const g = dash.data('weekly');
+    const p = dash.params().wk;
+    if (g.status !== 'ok' || !g.data.length) return p || null;
+    return g.data.some((w) => w.week_start === p) ? p : g.data[g.data.length - 1].week_start;
+  };
+  SV.weekRow = () => { const g = dash.data('weekly'); const wk = SV.week(); return g.status === 'ok' ? g.data.find((w) => w.week_start === wk) || null : null; };
+  SV.alertRow = (id) => { const g = dash.data('alerts'); const wk = SV.week(); return g.status === 'ok' ? g.data.find((a) => a.week_start === wk && a.alert === id) || null : null; };
+  // the filter every view uses: pure, so it can be tested
+  SV.apply = (rows, p, wk) => {
+    const q = (p.q || '').trim().toLowerCase();
+    return rows.filter((c) => {
+      if (wk && c.week_start !== wk) return false;
+      if (p.d1 && c.day < p.d1) return false;
+      if (p.d2 && c.day > p.d2) return false;
+      for (const k of Object.keys(SV.COL)) {
+        const v = p[k];
+        if (v == null || v === '') continue;
+        if (k === 'qa' && v === 'Failed') { if (!(c.qa_level === 'Soft fail' || c.qa_level === 'Fail')) return false; continue; }
+        if (c[SV.COL[k]] !== v) return false;
+      }
+      if (q && ![c.conversation_id, c.topic, c.language, c.outcome, c.escalation_reason, c.qa_level, c.handoff_status].join(' ').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  };
+  SV.sorted = (rows, key, dir) => {
+    if (!key) return rows;
+    const num = key === 'first_response_min';
+    const s = rows.slice().sort((a, b) => {
+      const x = num ? Number(a[key] || -1) : (a[key] || '') + (key === 'day' ? a.time : '');
+      const y = num ? Number(b[key] || -1) : (b[key] || '') + (key === 'day' ? b.time : '');
+      return x < y ? -1 : x > y ? 1 : 0;
+    });
+    return dir === 'desc' ? s.reverse() : s;
+  };
+  SV.current = () => {
+    const g = dash.data('conversations');
+    if (g.status !== 'ok') return [];
+    const p = dash.params();
+    return SV.sorted(SV.apply(g.data, p, SV.week()), p.sort || 'day', p.dir || 'asc');
+  };
+  SV.clearFilters = () => Object.fromEntries(SV.FILTERS.concat(['pg', 'sel', 'al']).map((k) => [k, null]));
+  SV.go = (filters, extra = {}) => {
+    dash.setParams({ ...SV.clearFilters(), ...filters, pg: 1, tab: null, ...extra });
+    document.querySelectorAll('#conversations').forEach((s) => s.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  SV.ALERT_FILTER = {
+    critical: { crit: 'Yes' }, overdue: { handoff: 'Overdue' }, esc_spike: { outcome: 'Escalated' }, esc_drop: { outcome: 'Resolved by AI' },
+    sla_breach: { sla: 'Breached' }, right_call_low: { right: 'No' }, qa_low: { qa: 'Failed' }, repeat_high: { outcome: 'Resolved by AI', repeat: 'Yes' },
+  };
+  SV.keyed = (sel, fn) => sel.attr('tabindex', 0).attr('role', 'button').on('click', fn).on('keydown', (e, d) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e, d); } });
+
+  // ---------- header controls ----------
+  dash.draw('weeks', (sel) => {
+    const g = dash.data('weekly');
+    sel.replaceChildren(...(g.status === 'ok' ? g.data : []).map((w) => new Option(SV.fmt.week(w.week_start), w.week_start)));
+    sel.value = SV.week() || '';
+    sel.onchange = () => dash.setParams({ wk: sel.value, d1: null, d2: null, pg: 1, sel: null });
+  });
+  const dayDraw = (param, first) => (sel) => {
+    const g = dash.data('conversations');
+    const wk = SV.week();
+    const days = g.status === 'ok' ? Array.from(new Set(g.data.filter((c) => c.week_start === wk).map((c) => c.day))).sort() : [];
+    sel.replaceChildren(new Option(first, ''), ...days.map((d) => new Option(SV.fmt.day(d), d)));
+    sel.value = dash.params()[param] || '';
+    sel.onchange = () => dash.setParams({ [param]: sel.value || null, pg: 1 });
+  };
+  dash.draw('days1', dayDraw('d1', 'Start of week'));
+  dash.draw('days2', dayDraw('d2', 'End of week'));
+
+  // ---------- numbers ----------
+  dash.draw('iv', (el) => {
+    const isAlert = el.dataset.source === 'alerts';
+    const r = isAlert ? SV.alertRow(el.dataset.alert) : SV.weekRow();
+    el.dataset.where = isAlert ? `week_start=${SV.week()}&alert=${el.dataset.alert}` : `week_start=${SV.week()}`;
+    el.textContent = r ? SV.fmt[el.dataset.fmt](r[el.dataset.col]) : '—';
+  });
+  dash.draw('kv', (el) => {
+    const r = SV.weekRow();
+    el.dataset.where = `week_start=${SV.week()}`;
+    el.textContent = r ? SV.fmt[el.dataset.fmt](r[el.dataset.field]) : '—';
+  });
+  dash.draw('kc', (el) => {
+    const w = SV.weekRow();
+    if (!w) { el.textContent = '—'; return; }
+    const a = (id) => SV.alertRow(id);
+    const f = SV.fmt;
+    el.textContent = ({
+      resolved_rate: () => `${f.count(w.resolved)} of ${f.count(w.total)} · last week ${f.pct(w.prev_resolved_rate)}`,
+      right_call_rate: () => `${f.count(w.right_calls)} of ${f.count(w.qa_reviewed)} reviewed · target ${f.pct(a('right_call_low')?.limit)}`,
+      qa_pass_rate: () => `${f.count(w.qa_passed)} of ${f.count(w.qa_reviewed)} reviewed · target ${f.pct(a('qa_low')?.limit)}`,
+      critical_incidents: () => `Target 0 · last week ${f.count(w.prev_critical)}`,
+      escalation_rate: () => w.avg_escalation_rate == null ? `${f.count(w.escalated)} of ${f.count(w.total)} · no earlier weeks` : `${f.count(w.escalated)} of ${f.count(w.total)} · ${w.prior_weeks}-week avg ${f.pct(w.avg_escalation_rate)}`,
+      repeat_rate: () => `${f.count(w.repeat_contacts)} of ${f.count(w.resolved)} · limit ${f.pct(a('repeat_high')?.limit)}`,
+    }[el.dataset.kpi] || (() => '—'))();
+  });
+  dash.draw('av', (el) => {
+    const r = SV.alertRow(el.dataset.alert);
+    el.dataset.where = `week_start=${SV.week()}&alert=${el.dataset.alert}`;
+    if (!r) { el.textContent = '—'; return; }
+    el.textContent = el.dataset.col === 'status' ? r.status : SV.fmt[el.dataset.fmt](r[el.dataset.col]);
+  });
+  dash.draw('alertvis', () => {
+    const g = dash.data('alerts');
+    const wk = SV.week();
+    const on = new Set(g.status === 'ok' ? g.data.filter((a) => a.week_start === wk && a.status === 'Triggered').map((a) => a.alert) : []);
+    document.querySelectorAll('.sv-alerts li[data-alert]').forEach((li) => { li.hidden = li.dataset.alert === 'none' ? (g.status !== 'ok' || on.size > 0) : !on.has(li.dataset.alert); });
+  });
+  dash.draw('matchcount', (el) => { el.textContent = `${SV.fmt.count(SV.current().length)} conversations`; });
+
+  // ---------- charts ----------
+  SV.tip = (el) => {
+    let t = el.querySelector(':scope > .sv-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'sv-tip'; t.hidden = true; el.append(t); }
+    return {
+      show: (event, lines) => {
+        t.replaceChildren(...lines.map((s, i) => { const d = document.createElement('div'); d.textContent = s; if (i === 0) d.style.color = 'var(--sv-muted)'; return d; }));
+        t.hidden = false;
+        const box = el.getBoundingClientRect();
+        const x = Math.min(Math.max(0, event.clientX - box.left + 12), box.width - t.offsetWidth - 4);
+        t.style.left = x + 'px'; t.style.top = Math.max(0, event.clientY - box.top - t.offsetHeight - 10) + 'px';
+      },
+      hide: () => { t.hidden = true; },
+    };
+  };
+
+  dash.draw('split', (el) => {
+    el.replaceChildren();
+    const w = SV.weekRow();
+    if (!w) return;
+    const p = dash.params();
+    const all = el.dataset.which === 'all';
+    const parts = all
+      ? [{ label: 'AI-handled', short: 'AI-handled', n: w.resolved, color: 'var(--sv-ai)', text: '#fff', f: { outcome: 'Resolved by AI' } }, { label: 'Escalated', short: 'escalated', n: w.escalated, color: 'var(--sv-esc)', text: '#fff', f: { outcome: 'Escalated' } }]
+      : [{ label: 'Needed a person', short: 'needed', n: w.esc_needed, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { outcome: 'Escalated', right: 'Yes' } }, { label: "Didn't need one", short: "didn't need", n: w.esc_not_needed, color: 'var(--sv-warn)', text: '#fff', f: { outcome: 'Escalated', right: 'No' } }];
+    const total = d3.sum(parts, (d) => d.n) || 1;
+    const W = Math.max(el.clientWidth, 260), H = 34;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', all ? 'AI-handled and escalated conversations' : 'Reviewed escalations that did or did not need a person');
+    const tip = SV.tip(el);
+    const x = d3.scaleLinear([0, total], [0, W]);
+    let x0 = 0;
+    parts.forEach((d) => {
+      const width = x(d.n);
+      const picked = Object.entries(d.f).every(([k, v]) => p[k] === v) && (all ? !p.right : true);
+      const g = svg.append('g');
+      const r = g.append('rect').datum(d).attr('class', 'is-click' + (picked ? ' is-picked' : '')).attr('x', x0).attr('y', 0).attr('width', Math.max(2, width - 2)).attr('height', H).attr('rx', 7).style('fill', d.color)
+        .attr('aria-label', `${d.label}: ${d.n} of ${total}`);
+      SV.keyed(r, () => SV.go(d.f));
+      r.on('pointermove', (e) => tip.show(e, [d.label, `${SV.fmt.count(d.n)} of ${SV.fmt.count(total)} · ${SV.fmt.pct(d.n / total)}`, 'Select to filter'])).on('pointerleave', tip.hide);
+      const lab = all ? d.label : d.label.charAt(0).toLowerCase() + d.label.slice(1);
+      const t = g.append('text').attr('x', x0 + 10).attr('y', H / 2).attr('dy', '0.35em').attr('font-size', 12.5).attr('font-weight', 600).attr('pointer-events', 'none').style('fill', d.text).text(`${SV.fmt.count(d.n)} ${all ? lab.replace('Escalated', 'escalated') : lab} · ${SV.fmt.pct(d.n / total)}`);
+      const fits = () => t.node().getComputedTextLength() + 20 <= width;
+      if (!fits()) t.text(`${SV.fmt.count(d.n)} ${d.short}`);
+      if (!fits()) t.text(SV.fmt.count(d.n));
+      if (!fits()) t.remove();
+      x0 += width;
+    });
+  });
+
+  SV.handoffParts = (w) => [
+    { label: 'Picked up on time', n: w.picked_on_time, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { handoff: 'Picked up', sla: 'Met' } },
+    { label: 'Picked up late', n: w.picked_late, color: 'var(--sv-warn)', text: '#fff', f: { handoff: 'Picked up', sla: 'Breached' } },
+    { label: 'Waiting', n: w.waiting, color: 'color-mix(in srgb, var(--sv-warn) 45%, var(--sv-card))', text: 'var(--sv-fg)', f: { handoff: 'Waiting' } },
+    { label: 'Overdue', n: w.overdue, color: 'var(--sv-bad)', text: '#fff', f: { handoff: 'Overdue' } },
+  ];
+  dash.draw('handoffbar', (el) => {
+    el.replaceChildren();
+    const w = SV.weekRow();
+    if (!w) return;
+    const parts = SV.handoffParts(w).filter((d) => d.n > 0);
+    const total = d3.sum(parts, (d) => d.n) || 1;
+    const W = Math.max(el.clientWidth, 260), H = 34;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'Handoffs by status');
+    const tip = SV.tip(el);
+    const minW = 8;
+    const extra = parts.reduce((a, d) => a + Math.max(0, minW - (d.n / total) * W), 0);
+    const big = d3.sum(parts.filter((d) => (d.n / total) * W > minW), (d) => d.n) || 1;
+    let x0 = 0;
+    parts.forEach((d) => {
+      const raw = (d.n / total) * W;
+      const width = raw < minW ? minW : raw - (extra * d.n) / big;
+      const g = svg.append('g');
+      const r = g.append('rect').attr('class', 'is-click').attr('x', x0).attr('y', 0).attr('width', Math.max(3, width - 2)).attr('height', H).attr('rx', 6).style('fill', d.color).attr('aria-label', `${d.label}: ${d.n}`);
+      SV.keyed(r, () => SV.go(d.f));
+      r.on('pointermove', (e) => tip.show(e, [d.label, `${SV.fmt.count(d.n)} of ${SV.fmt.count(total)} handoffs`, 'Select to filter'])).on('pointerleave', tip.hide);
+      const t = g.append('text').attr('x', x0 + 10).attr('y', H / 2).attr('dy', '0.35em').attr('font-size', 12.5).attr('font-weight', 600).attr('pointer-events', 'none').style('fill', d.text).text(`${SV.fmt.count(d.n)} ${d.label.toLowerCase()}`);
+      if (t.node().getComputedTextLength() + 20 > width) { t.text(SV.fmt.count(d.n)); if (t.node().getComputedTextLength() + 16 > width) t.remove(); }
+      x0 += width;
+    });
+  });
+  dash.draw('handofflegend', (el) => {
+    el.replaceChildren();
+    const w = SV.weekRow();
+    if (!w) return;
+    const p = dash.params();
+    SV.handoffParts(w).forEach((d) => {
+      const b = document.createElement('button');
+      b.className = 'sv-chip';
+      b.setAttribute('aria-pressed', String(Object.entries(d.f).every(([k, v]) => p[k] === v)));
+      const i = document.createElement('i'); i.style.background = d.color; i.style.marginRight = '6px';
+      b.append(i, document.createTextNode(`${d.label} ${SV.fmt.count(d.n)}`));
+      b.addEventListener('click', () => SV.go(d.f));
+      el.append(b);
+    });
+  });
+
+  dash.draw('reasons', (el) => {
+    el.replaceChildren();
+    const g = dash.data('reasons');
+    if (g.status !== 'ok') return;
+    const wk = SV.week();
+    const rows = g.data.filter((r) => r.week_start === wk).sort((a, b) => b.count - a.count);
+    const W = Math.max(el.clientWidth, 280), rh = Math.max(24, Math.min(34, 210 / Math.max(1, rows.length))), H = Math.max(rh, rows.length * rh);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'Escalations by reason');
+    const tip = SV.tip(el);
+    const probe = svg.append('text').attr('font-size', 12.5);
+    const labelW = Math.min(W * 0.5, (d3.max(rows, (r) => { probe.text(r.reason); return probe.node().getComputedTextLength(); }) || 80) + 12);
+    probe.text('0,000'); const valW = probe.node().getComputedTextLength() + 14; probe.remove();
+    const x = d3.scaleLinear([0, d3.max(rows, (r) => r.count) || 1], [0, W - labelW - valW]);
+    const picked = dash.params().reason;
+    const row = svg.selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${i * rh})`);
+    row.append('text').attr('y', rh / 2).attr('dy', '0.35em').attr('font-size', 12.5).style('fill', 'var(--sv-fg)').text((d) => d.reason);
+    const bar = row.append('rect').attr('class', (d) => 'is-click' + (picked === d.reason ? ' is-picked' : '')).attr('x', labelW).attr('y', 6).attr('height', rh - 12).attr('rx', 5).attr('width', (d) => Math.max(2, x(d.count))).style('fill', 'var(--sv-esc)')
+      .attr('aria-label', (d) => `${d.reason}: ${d.count} escalations`);
+    SV.keyed(bar, (e, d) => SV.go({ outcome: 'Escalated', reason: d.reason }));
+    bar.on('pointermove', (e, d) => tip.show(e, [d.reason, `${SV.fmt.count(d.count)} escalations`, `${d.not_needed} of ${d.reviewed} reviewed didn't need a person`, 'Select to filter'])).on('pointerleave', tip.hide);
+    row.append('rect').attr('pointer-events', 'none').attr('x', (d) => labelW + x(d.count) * (1 - (d.reviewed ? d.not_needed / d.reviewed : 0))).attr('y', 6).attr('height', rh - 12).attr('rx', 5)
+      .attr('width', (d) => x(d.count) * (d.reviewed ? d.not_needed / d.reviewed : 0)).style('fill', 'var(--sv-warn)');
+    row.append('text').attr('x', (d) => labelW + Math.max(2, x(d.count)) + 6).attr('y', rh / 2).attr('dy', '0.35em').attr('font-size', 12).style('fill', 'var(--sv-muted)').text((d) => SV.fmt.count(d.count));
+  });
+
+  dash.draw('levels', (el) => {
+    el.replaceChildren();
+    const g = dash.data('level_mix');
+    if (g.status !== 'ok') return;
+    const wk = SV.week();
+    const order = ['Pass', 'Soft pass', 'Soft fail', 'Fail', 'Not reviewed', 'Audit only'];
+    const color = { 'Pass': 'var(--sv-ai)', 'Soft pass': 'var(--sv-ai)', 'Soft fail': 'var(--sv-warn)', 'Fail': 'var(--sv-bad)', 'Not reviewed': 'var(--sv-neutral)', 'Audit only': 'var(--sv-esc-soft)' };
+    const rows = order.map((level) => g.data.find((r) => r.week_start === wk && r.level === level) || { level, count: 0 });
+    const outside = (l) => l === 'Not reviewed' || l === 'Audit only';
+    const reviewed = d3.sum(rows.filter((r) => !outside(r.level)), (r) => r.count);
+    const W = Math.max(el.clientWidth, 280), rh = 35, H = rows.length * rh;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'QA results by level');
+    const tip = SV.tip(el);
+    const probe = svg.append('text').attr('font-size', 12.5);
+    const labelW = (d3.max(rows, (r) => { probe.text(r.level); return probe.node().getComputedTextLength(); }) || 80) + 12;
+    probe.text('0,000 · 100%'); const valW = probe.node().getComputedTextLength() + 14; probe.remove();
+    const x = d3.scaleLinear([0, reviewed || 1], [0, W - labelW - valW]);
+    const picked = dash.params().qa;
+    const row = svg.selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${i * rh})`);
+    row.append('text').attr('y', rh / 2).attr('dy', '0.35em').attr('font-size', 12.5).style('fill', (d) => outside(d.level) ? 'var(--sv-muted)' : 'var(--sv-fg)').text((d) => d.level);
+    const bar = row.append('rect').attr('class', (d) => 'is-click' + (picked === d.level ? ' is-picked' : '')).attr('x', labelW).attr('y', 6).attr('height', rh - 12).attr('rx', 5)
+      .attr('width', (d) => outside(d.level) ? 6 : Math.max(2, x(d.count))).style('fill', (d) => color[d.level]).style('opacity', (d) => d.level === 'Soft pass' ? 0.55 : 1)
+      .attr('aria-label', (d) => `${d.level}: ${d.count}`);
+    SV.keyed(bar, (e, d) => SV.go({ qa: d.level }));
+    bar.on('pointermove', (e, d) => tip.show(e, [d.level, outside(d.level) ? `${SV.fmt.count(d.count)} ${d.level === 'Audit only' ? 'in targeted audits, not QA-scored' : 'outside the QA sample'}` : `${SV.fmt.count(d.count)} of ${reviewed} reviewed · ${SV.fmt.pct(d.count / reviewed)}`, 'Select to filter'])).on('pointerleave', tip.hide);
+    row.append('text').attr('x', (d) => labelW + (outside(d.level) ? 6 : Math.max(2, x(d.count))) + 6).attr('y', rh / 2).attr('dy', '0.35em').attr('font-size', 12).style('fill', 'var(--sv-muted)')
+      .text((d) => outside(d.level) ? SV.fmt.count(d.count) : `${SV.fmt.count(d.count)} · ${SV.fmt.pct(d.count / reviewed)}`);
+  });
+
+  dash.draw('trend', (el) => {
+    el.replaceChildren();
+    const g = dash.data('weekly');
+    if (g.status !== 'ok') return;
+    const rows = g.data.map((r) => ({ ...r, date: new Date(r.week_start + 'T00:00:00Z') }));
+    const series = [['escalation_rate', 'Escalation', 'var(--sv-esc)'], ['qa_pass_rate', 'QA pass', 'var(--sv-ai)'], ['right_call_rate', 'Right call', 'var(--sv-warn)']];
+    const W = Math.max(el.clientWidth, 280), H = 184, m = { t: 12, r: 90, b: 26, l: 40 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'Weekly escalation, QA pass and right-call rates');
+    const last = rows[rows.length - 1];
+    const probe = svg.append('text').attr('font-size', 11.5).attr('font-weight', 600);
+    m.r = (d3.max(series, ([k, n]) => { probe.text(`${n} ${SV.fmt.pct(last[k])}`); return probe.node().getComputedTextLength(); }) || 80) + 14;
+    probe.remove();
+    const x = d3.scalePoint(rows.map((r) => r.week_start), [m.l + 8, W - m.r - 8]);
+    const y = d3.scaleLinear([0, 1], [H - m.b, m.t]);
+    const wk = SV.week();
+    // week bands: select a week
+    const band = (W - m.l - m.r) / rows.length;
+    const tip = SV.tip(el);
+    const hit = svg.append('g').selectAll('rect').data(rows).join('rect').attr('class', 'is-click').attr('x', (r) => x(r.week_start) - band / 2).attr('y', m.t).attr('width', band).attr('height', H - m.t - m.b)
+      .style('fill', (r) => r.week_start === wk ? 'var(--sv-soft)' : 'transparent').attr('aria-label', (r) => SV.fmt.week(r.week_start));
+    SV.keyed(hit, (e, r) => dash.setParams({ wk: r.week_start, d1: null, d2: null, pg: 1, sel: null }));
+    hit.on('pointermove', (e, r) => tip.show(e, [SV.fmt.week(r.week_start), ...series.map(([k, n]) => `${n}: ${SV.fmt.pct(r[k])}`), 'Select to view this week'])).on('pointerleave', tip.hide);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--sv-line)').attr('pointer-events', 'none');
+    const ya = svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('.0%')).tickSize(0)).attr('font-size', null).attr('font-family', null);
+    ya.select('.domain').remove(); ya.selectAll('text').style('fill', 'var(--sv-muted)').attr('font-size', 11).attr('dx', '-4');
+    const every = Math.ceil(rows.length / Math.max(2, Math.floor((W - m.l - m.r) / 70)));
+    const xa = svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(rows.map((r) => r.week_start).filter((d, i) => i % every === 0 || i === rows.length - 1)).tickFormat((d) => d3.utcFormat('%b %-d')(new Date(d + 'T00:00:00Z'))).tickSize(0)).attr('font-size', null).attr('font-family', null);
+    xa.select('.domain').style('stroke', 'var(--sv-line)'); xa.selectAll('text').style('fill', 'var(--sv-muted)').attr('font-size', 11).attr('dy', '1.1em');
+    series.forEach(([k, , c]) => {
+      svg.append('path').datum(rows).attr('pointer-events', 'none').attr('fill', 'none').style('stroke', c).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('d', d3.line().x((r) => x(r.week_start)).y((r) => y(r[k])));
+      svg.append('g').attr('pointer-events', 'none').selectAll('circle').data(rows).join('circle').attr('cx', (r) => x(r.week_start)).attr('cy', (r) => y(r[k])).attr('r', (r) => r.week_start === wk ? 4.5 : 2.5).style('fill', c);
+    });
+    const ends = series.map(([k, n, c]) => ({ y: y(last[k]), text: `${n} ${SV.fmt.pct(last[k])}`, c })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+    svg.append('g').attr('pointer-events', 'none').selectAll('text').data(ends).join('text').attr('x', W - m.r + 8).attr('y', (d) => d.y).attr('dy', '0.35em').attr('font-size', 11.5).attr('font-weight', 600).style('fill', (d) => d.c).text((d) => d.text);
+  });
+
+  // ---------- table ----------
+  const TAG = { 'Resolved by AI': 'is-ok', 'Escalated': '', 'Breached': 'is-bad', 'Met': 'is-ok', 'Pending': 'is-warn', 'Overdue': 'is-bad', 'Waiting': 'is-warn', 'Picked up': '', 'Pass': 'is-ok', 'Soft pass': 'is-ok', 'Soft fail': 'is-warn', 'Fail': 'is-bad', 'Not reviewed': 'is-muted', 'Audit only': 'is-muted' };
+  const TAGGED = new Set(['outcome', 'handoff_status', 'sla_status', 'qa_level']);
+  dash.draw('rows', (tb) => {
+    tb.replaceChildren();
+    const p = dash.params();
+    const all = SV.current();
+    const pages = Math.max(1, Math.ceil(all.length / SV.PAGE));
+    const pg = Math.min(Math.max(1, Number(p.pg) || 1), pages);
+    const cols = ['conversation_id', 'day', 'topic', 'language', 'outcome', 'escalation_reason', 'handoff_status', 'sla_status', 'qa_level', 'right_call', 'repeat_contact', 'critical_incident'];
+    all.slice((pg - 1) * SV.PAGE, pg * SV.PAGE).forEach((c) => {
+      const tr = document.createElement('tr');
+      tr.dataset.key = c.conversation_id;
+      tr.className = [p.sel === c.conversation_id ? 'is-sel' : '', c.critical_incident === 'Yes' ? 'is-crit' : '', c.handoff_status === 'Overdue' ? 'is-overdue' : ''].filter(Boolean).join(' ');
+      cols.forEach((k) => {
+        const td = document.createElement('td');
+        const v = c[k];
+        if (k === 'conversation_id') {
+          const b = document.createElement('button'); b.className = 'sv-idbtn'; b.textContent = v; b.setAttribute('aria-label', 'Open details for ' + v);
+          b.addEventListener('click', () => dash.setParams({ sel: v }));
+          td.append(b);
+        } else if (k === 'day') td.textContent = d3.utcFormat('%b %-d')(new Date(v + 'T00:00:00Z')) + ' ' + c.time;
+        else if (TAGGED.has(k) && v && v !== '—') { const s = document.createElement('span'); s.className = 'sv-tag ' + (TAG[v] || ''); s.textContent = v; td.append(s); }
+        else if (k === 'right_call' && (v === 'Not reviewed' || v === 'Audit only')) { const s = document.createElement('span'); s.className = 'sv-tag is-muted'; s.textContent = v; td.append(s); }
+        else if (k === 'right_call' && v === 'No') { const s = document.createElement('span'); s.className = 'sv-tag is-warn'; s.textContent = 'No'; td.append(s); }
+        else if (k === 'critical_incident' && v === 'Yes') { const s = document.createElement('span'); s.className = 'sv-tag is-bad'; s.textContent = 'Yes'; td.append(s); }
+        else td.textContent = v || '—';
+        tr.append(td);
+      });
+      tb.append(tr);
+    });
+  });
+  dash.draw('advcount', (el) => {
+    const p = dash.params();
+    const n = ['topic', 'lang', 'outcome', 'reason', 'handed', 'handoff', 'sla', 'qa', 'right', 'repeat', 'crit', 'resolved', 'rtype', 'reviewer', 'finding'].filter((k) => p[k] != null && p[k] !== '').length;
+    el.textContent = n ? ` (${n})` : '';
+  });
+  dash.draw('count', (el) => {
+    const g = dash.data('conversations');
+    if (g.status !== 'ok') { el.textContent = '—'; return; }
+    const n = SV.current().length;
+    el.textContent = `${SV.fmt.count(n)} matching conversations`;
+  });
+  dash.draw('pageinfo', (el) => {
+    const n = SV.current().length;
+    const pages = Math.max(1, Math.ceil(n / SV.PAGE));
+    const pg = Math.min(Math.max(1, Number(dash.params().pg) || 1), pages);
+    el.textContent = `Page ${pg} of ${pages}`;
+  });
+  dash.draw('opts', (sel) => {
+    const g = dash.data('conversations');
+    const col = sel.dataset.col;
+    const vals = g.status === 'ok' ? Array.from(new Set(g.data.map((c) => c[col]))).filter((v) => v !== '').sort() : [];
+    sel.replaceChildren(new Option('Any', ''), ...vals.map((v) => new Option(v === '—' ? 'Not applicable' : v, v)));
+    const cur = dash.params()[sel.dataset.param];
+    sel.value = vals.includes(cur) ? cur : '';
+    sel.onchange = () => dash.setParams({ [sel.dataset.param]: sel.value || null, pg: 1 });
+  });
+  dash.draw('active', (el) => {
+    el.replaceChildren();
+    const p = dash.params();
+    SV.FILTERS.filter((k) => p[k] != null && p[k] !== '').forEach((k) => {
+      const b = document.createElement('button');
+      const v = k === 'qa' && p[k] === 'Failed' ? 'Soft fail or fail' : (k === 'd1' || k === 'd2') ? SV.fmt.day(p[k]) : p[k];
+      b.textContent = `${SV.LABEL[k]}: ${v === '—' ? 'Not applicable' : v} ×`;
+      b.setAttribute('aria-label', `Remove filter ${SV.LABEL[k]}`);
+      b.addEventListener('click', () => dash.setParams({ [k]: null, pg: 1 }));
+      el.append(b);
+    });
+  });
+
+  // ---------- detail drawer ----------
+  SV.selRow = () => { const id = dash.params().sel; const g = dash.data('conversations'); return id && g.status === 'ok' ? g.data.find((c) => c.conversation_id === id) || null : null; };
+  dash.draw('dv', (el) => {
+    const r = SV.selRow();
+    el.dataset.where = r ? `conversation_id=${r.conversation_id}` : '';
+    if (!r) { el.textContent = '—'; return; }
+    const v = r[el.dataset.col];
+    const nr = r.review_type === 'Not reviewed' && ['qa_reviewer', 'review_date'].includes(el.dataset.col);
+    el.textContent = nr ? 'Not reviewed' : (el.dataset.col === 'day' || el.dataset.col === 'review_date') && v ? SV.fmt.day(v) : el.dataset.col === 'first_response_min' ? (v ? v + ' min' : '—') : (v || '—');
+  });
+  dash.draw('tv', (el) => {
+    const r = SV.selRow();
+    const g = dash.data('templates');
+    const id = r ? r[el.dataset.ref] : null;
+    el.dataset.where = id ? `template_id=${id}` : '';
+    const t = g.status === 'ok' && id ? g.data.find((x) => x.template_id === id) : null;
+    el.textContent = t ? t.text : '—';
+  });
+
+  // ---------- quality & audits ----------
+  SV.revRow = () => { const g = dash.data('reviews'); const wk = SV.week(); return g.status === 'ok' ? g.data.find((r) => r.week_start === wk) || null : null; };
+  dash.draw('rv', (el) => {
+    const r = SV.revRow();
+    el.dataset.where = `week_start=${SV.week()}`;
+    el.textContent = r ? SV.fmt[el.dataset.fmt](r[el.dataset.col]) : '—';
+  });
+  dash.draw('comp', (el) => {
+    el.replaceChildren();
+    const r = SV.revRow();
+    if (!r) return;
+    const parts = [
+      { label: 'Random sample', short: 'random', n: r.random, color: 'var(--sv-ai)', text: '#fff', f: { rtype: 'Random sample' } },
+      { label: 'Targeted audit', short: 'targeted', n: r.targeted, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { rtype: 'Targeted audit' } },
+      { label: 'Not reviewed', short: 'not reviewed', n: r.not_reviewed, color: 'var(--sv-soft)', text: 'var(--sv-muted)', f: { rtype: 'Not reviewed' } },
+    ];
+    const W = Math.max(el.clientWidth, 260), H = 34;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'Review coverage this week');
+    const tip = SV.tip(el);
+    const x = d3.scaleLinear([0, r.total], [0, W]);
+    let x0 = 0;
+    parts.forEach((d) => {
+      const width = x(d.n);
+      const g = svg.append('g');
+      const rect = g.append('rect').attr('class', 'is-click').attr('x', x0).attr('y', 0).attr('width', Math.max(2, width - 2)).attr('height', H).attr('rx', 7).style('fill', d.color).style('stroke', d.label === 'Not reviewed' ? 'var(--sv-line)' : null).attr('aria-label', `${d.label}: ${d.n}`);
+      SV.keyed(rect, () => SV.go(d.f));
+      rect.on('pointermove', (e) => tip.show(e, [d.label, `${SV.fmt.count(d.n)} of ${SV.fmt.count(r.total)} · ${SV.fmt.pct(d.n / r.total)}`, 'Select to see these conversations'])).on('pointerleave', tip.hide);
+      const t = g.append('text').attr('x', x0 + 10).attr('y', H / 2).attr('dy', '0.35em').attr('font-size', 12.5).attr('font-weight', 600).attr('pointer-events', 'none').style('fill', d.text).text(`${SV.fmt.count(d.n)} ${d.label.charAt(0).toLowerCase() + d.label.slice(1)}`);
+      const fits = () => t.node().getComputedTextLength() + 20 <= width;
+      if (!fits()) t.text(`${SV.fmt.count(d.n)} ${d.short}`);
+      if (!fits()) t.text(SV.fmt.count(d.n));
+      if (!fits()) t.remove();
+      x0 += width;
+    });
+  });
+  dash.draw('qbar', (el) => {
+    el.replaceChildren();
+    const r = SV.revRow();
+    if (!r) return;
+    const parts = el.dataset.which === 'outcome'
+      ? [{ label: 'AI-handled', n: r.random_ai, color: 'var(--sv-ai)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Resolved by AI' } }, { label: 'Escalated', n: r.random_esc, color: 'var(--sv-esc)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Escalated' } }]
+      : [{ label: 'No issue', n: r.audit_ok, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { finding: 'No issue' } }, { label: 'Late pickup', n: r.audit_late, color: 'var(--sv-warn)', text: '#fff', f: { finding: 'Issue found: late pickup' } }, { label: 'Other issue', n: r.audit_other, color: 'var(--sv-bad)', text: '#fff', f: { finding: 'Issue found' } }];
+    const total = d3.sum(parts, (d) => d.n) || 1;
+    const W = Math.max(el.clientWidth, 220), H = 30;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', el.dataset.which === 'outcome' ? 'Random sample by outcome' : 'Targeted audit findings');
+    const tip = SV.tip(el);
+    const x = d3.scaleLinear([0, total], [0, W]);
+    let x0 = 0;
+    parts.forEach((d) => {
+      const width = x(d.n);
+      if (width <= 0) return;
+      const g = svg.append('g');
+      const rect = g.append('rect').attr('class', 'is-click').attr('x', x0).attr('y', 0).attr('width', Math.max(3, width - 2)).attr('height', H).attr('rx', 6).style('fill', d.color).attr('aria-label', `${d.label}: ${d.n}`);
+      SV.keyed(rect, () => SV.go(d.f));
+      rect.on('pointermove', (e) => tip.show(e, [d.label, `${SV.fmt.count(d.n)} of ${SV.fmt.count(total)} · ${SV.fmt.pct(d.n / total)}`, 'Select to see these conversations'])).on('pointerleave', tip.hide);
+      const t = g.append('text').attr('x', x0 + 9).attr('y', H / 2).attr('dy', '0.35em').attr('font-size', 12).attr('font-weight', 600).attr('pointer-events', 'none').style('fill', d.text).text(`${SV.fmt.count(d.n)} ${d.label === 'AI-handled' ? d.label : d.label.toLowerCase()}`);
+      if (t.node().getComputedTextLength() + 18 > width) { t.text(SV.fmt.count(d.n)); if (t.node().getComputedTextLength() + 14 > width) t.remove(); }
+      x0 += width;
+    });
+  });
+  dash.draw('disagree', (el) => {
+    el.replaceChildren();
+    const g = dash.data('conversations');
+    if (g.status !== 'ok') return;
+    const wk = SV.week();
+    g.data.filter((c) => c.week_start === wk && c.calibration === 'Disagreed').forEach((c) => {
+      const b = document.createElement('button');
+      b.className = 'sv-chip';
+      b.textContent = `${c.conversation_id}: ${c.qa_reviewer} ${c.qa_level} · ${c.second_reviewer} ${c.second_level}`;
+      b.setAttribute('aria-label', `Open ${c.conversation_id}`);
+      b.addEventListener('click', () => SV.go({ q: c.conversation_id }, { sel: c.conversation_id }));
+      el.append(b);
+    });
+  });
+  dash.draw('agreetrend', (el) => {
+    el.replaceChildren();
+    const g = dash.data('reviews');
+    if (g.status !== 'ok') return;
+    const rows = g.data;
+    const wk = SV.week();
+    const W = Math.max(el.clientWidth, 260), H = 130, m = { t: 18, b: 18 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'group').attr('aria-label', 'Calibration score by week');
+    const tip = SV.tip(el);
+    const x = d3.scaleBand(rows.map((r) => r.week_start), [0, W]).padding(0.25);
+    const y = d3.scaleLinear([0, 1], [H - m.b, m.t]);
+    const bar = svg.selectAll('rect').data(rows).join('rect').attr('class', 'is-click').attr('x', (r) => x(r.week_start)).attr('width', x.bandwidth()).attr('y', (r) => y(r.agreement_rate || 0)).attr('height', (r) => y(0) - y(r.agreement_rate || 0)).attr('rx', 4)
+      .style('fill', (r) => r.week_start === wk ? 'var(--sv-esc)' : 'var(--sv-esc-soft)').attr('aria-label', (r) => `${SV.fmt.week(r.week_start)}: ${SV.fmt.pct(r.agreement_rate)}`);
+    SV.keyed(bar, (e, r) => dash.setParams({ wk: r.week_start }));
+    bar.on('pointermove', (e, r) => tip.show(e, [SV.fmt.week(r.week_start), `Calibration score ${SV.fmt.pct(r.agreement_rate)} · ${r.agreed} of ${r.double_scored}`, 'Select to view this week'])).on('pointerleave', tip.hide);
+    svg.append('g').selectAll('text').data(rows).join('text').attr('x', (r) => x(r.week_start) + x.bandwidth() / 2).attr('y', (r) => y(r.agreement_rate || 0) - 5).attr('text-anchor', 'middle').attr('font-size', 11).attr('font-weight', 600).attr('pointer-events', 'none').style('fill', 'var(--sv-fg)').text((r) => SV.fmt.pct(r.agreement_rate));
+    svg.append('g').selectAll('text').data(rows).join('text').attr('x', (r) => x(r.week_start) + x.bandwidth() / 2).attr('y', H - 4).attr('text-anchor', 'middle').attr('font-size', 10.5).style('fill', 'var(--sv-muted)').text((r) => d3.utcFormat('%b %-d')(new Date(r.week_start + 'T00:00:00Z')));
+  });
+  dash.draw('volume', (el) => {
+    el.replaceChildren();
+    const g = dash.data('reviewer_volume'), rb = dash.data('rubric');
+    if (g.status !== 'ok') return;
+    const wk = SV.week();
+    const role = (n) => (rb.status === 'ok' ? rb.data.find((r) => r.item_type === 'Reviewer' && r.name === n) : null)?.description || '';
+    g.data.filter((r) => r.week_start === wk).sort((a, b) => b.total - a.total).forEach((r) => {
+      const row = document.createElement('div'); row.className = 'sv-qrow';
+      const who = document.createElement('div');
+      const b = document.createElement('button'); b.className = 'sv-namebtn'; b.textContent = r.reviewer; b.setAttribute('aria-label', `Show conversations reviewed by ${r.reviewer}`);
+      b.addEventListener('click', () => SV.go({ reviewer: r.reviewer }));
+      const sm = document.createElement('small'); sm.textContent = role(r.reviewer);
+      who.append(b, sm);
+      const cell = (t) => { const s = document.createElement('span'); s.textContent = t; return s; };
+      row.append(who, cell(SV.fmt.count(r.random)), cell(SV.fmt.count(r.targeted)), cell(SV.fmt.count(r.second_scored)), cell(SV.fmt.count(r.total)), cell(SV.fmt.pct(r.pass_rate_given)));
+      el.append(row);
+    });
+  });
+  dash.draw('rubric', (el) => {
+    el.replaceChildren();
+    const g = dash.data('rubric');
+    if (g.status !== 'ok') return;
+    g.data.filter((r) => r.item_type === 'Rubric part').sort((a, b) => a.order - b.order).forEach((r) => {
+      const name = document.createElement('b'); name.textContent = r.name;
+      const d = document.createElement('div'); d.textContent = r.description;
+      const w = document.createElement('span'); w.className = 'w'; w.textContent = SV.fmt.pct(r.weight);
+      el.append(name, d, w);
+    });
+  });
+  dash.draw('leveldefs', (el) => {
+    el.replaceChildren();
+    const g = dash.data('rubric');
+    if (g.status !== 'ok') return;
+    const cls = { 'Pass': 'is-ok', 'Soft pass': 'is-ok', 'Soft fail': 'is-warn', 'Fail': 'is-bad', 'Critical incident': 'is-bad' };
+    g.data.filter((r) => r.item_type === 'Level').sort((a, b) => a.order - b.order).forEach((r) => {
+      const t = document.createElement('span'); t.className = 'sv-tag ' + (cls[r.name] || ''); t.textContent = r.name;
+      const holder = document.createElement('div'); holder.append(t);
+      const d = document.createElement('div'); d.textContent = r.description;
+      el.append(holder, d);
+    });
+  });
+
+  // ---------- controls that listen and set state ----------
+  document.querySelectorAll('.sv-tab').forEach((b) => b.addEventListener('click', () => dash.setParams({ tab: b.dataset.tab === 'overview' ? null : b.dataset.tab })));
+  const P = () => dash.params();
+  document.querySelectorAll('.sv-kpi').forEach((b) => b.addEventListener('click', () => SV.go(JSON.parse(b.dataset.go))));
+  document.querySelectorAll('.sv-al-btn').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.alert;
+    if (P().al === id) { dash.setParams({ ...SV.clearFilters() }); return; }
+    dash.setParams({ ...SV.clearFilters(), ...SV.ALERT_FILTER[id], al: id, pg: 1 });
+  }));
+  document.querySelectorAll('.sv-clear-alert, .sv-clearall').forEach((b) => b.addEventListener('click', () => dash.setParams(SV.clearFilters())));
+  document.querySelectorAll('.sv-chip[data-quick]').forEach((b) => b.addEventListener('click', () => {
+    const q = JSON.parse(b.dataset.quick);
+    const on = Object.entries(q).every(([k, v]) => P()[k] === v);
+    dash.setParams({ ...Object.fromEntries(Object.keys(q).map((k) => [k, on ? null : q[k]])), pg: 1 });
+  }));
+  document.querySelectorAll('.sv-advbtn').forEach((b) => b.addEventListener('click', () => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    document.querySelectorAll('#adv').forEach((a) => { a.hidden = !open; });
+  }));
+  document.querySelectorAll('.sv-q').forEach((inp) => inp.addEventListener('input', () => dash.setParams({ q: inp.value || null, pg: 1 })));
+  document.querySelectorAll('.sv-table th[data-sort] button').forEach((b) => b.addEventListener('click', () => {
+    const key = b.parentElement.dataset.sort;
+    const p = P();
+    const cur = p.sort || 'day';
+    dash.setParams({ sort: key, dir: cur === key && p.dir !== 'desc' ? 'desc' : 'asc', pg: 1 });
+  }));
+  const step = (d) => () => {
+    const pages = Math.max(1, Math.ceil(SV.current().length / SV.PAGE));
+    dash.setParams({ pg: Math.min(pages, Math.max(1, (Number(P().pg) || 1) + d)) });
+  };
+  document.querySelectorAll('.sv-prev').forEach((b) => b.addEventListener('click', step(-1)));
+  document.querySelectorAll('.sv-next').forEach((b) => b.addEventListener('click', step(1)));
+  document.querySelectorAll('.sv-close').forEach((b) => b.addEventListener('click', () => dash.setParams({ sel: null })));
+  document.querySelectorAll('.sv-dark').forEach((b) => b.addEventListener('click', () => {
+    const dark = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(dark));
+    document.querySelectorAll('.sv').forEach((s) => s.classList.toggle('is-dark', dark));
+  }));
+
+  // keep Alerts & actions the same height as the right-hand column, so changing week never shifts the page
+  SV.lockAlerts = () => {
+    document.querySelectorAll('#alerts').forEach((al) => {
+      const ul = al.querySelector('.sv-alerts');
+      const col = document.querySelector('#alerts + .sv-col');
+      if (!ul || !col) return;
+      ul.style.height = '';
+      ul.classList.remove('is-locked');
+      const side = Math.abs(al.getBoundingClientRect().top - col.getBoundingClientRect().top) < 4 && al.getBoundingClientRect().left < col.getBoundingClientRect().left;
+      if (!al.open || !side) return;
+      const target = col.offsetHeight - (al.offsetHeight - ul.offsetHeight);
+      ul.style.height = Math.max(140, target) + 'px';
+      ul.classList.add('is-locked');
+    });
+  };
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => SV.lockAlerts());
+    document.querySelectorAll('#alerts + .sv-col').forEach((c) => ro.observe(c));
+  }
+  window.addEventListener('resize', () => SV.lockAlerts());
+  document.querySelectorAll('#alerts, #alerts details, #where, #handoffs').forEach((d) => d.addEventListener('toggle', () => requestAnimationFrame(SV.lockAlerts)));
+
+  // reflect state: pressed chips, alert styling, panels, sort, pager
+  dash.onData(() => {
+    const p = P();
+    const g = dash.data('alerts');
+    const wk = SV.week();
+    const on = new Set(g.status === 'ok' ? g.data.filter((a) => a.week_start === wk && a.status === 'Triggered').map((a) => a.alert) : []);
+    document.querySelectorAll('.sv-kpi').forEach((k) => {
+      const ids = (k.dataset.alerts || '').split(' ').filter(Boolean);
+      const hot = ids.some((id) => on.has(id));
+      const good = g.status === 'ok' && ids.length > 0 && !hot && ids.every((id) => g.data.some((a) => a.week_start === wk && a.alert === id && a.status === 'OK'));
+      k.classList.toggle('is-alert', hot);
+      k.classList.toggle('is-good', good);
+      k.querySelectorAll('.sv-kpi-flag').forEach((f) => { f.hidden = !hot; });
+      k.querySelectorAll('.sv-kpi-good').forEach((f) => { f.hidden = !good; });
+    });
+    document.querySelectorAll('.sv-al-btn').forEach((b) => b.setAttribute('aria-pressed', String(p.al === b.dataset.alert)));
+    document.querySelectorAll('#alert-detail').forEach((d) => { d.hidden = !p.al; });
+    document.querySelectorAll('[data-alert-note]').forEach((n) => { n.hidden = n.dataset.alertNote !== p.al; });
+    document.querySelectorAll('.sv-chip[data-quick]').forEach((b) => { const q = JSON.parse(b.dataset.quick); b.setAttribute('aria-pressed', String(Object.entries(q).every(([k, v]) => p[k] === v))); });
+    document.querySelectorAll('.sv-table th[data-sort]').forEach((th) => { const k = th.dataset.sort; th.setAttribute('aria-sort', (p.sort || 'day') === k ? (p.dir === 'desc' ? 'descending' : 'ascending') : 'none'); });
+    document.querySelectorAll('#drawer').forEach((d) => { d.hidden = !p.sel; });
+    const tab = p.tab || 'overview';
+    document.querySelectorAll('.sv-view').forEach((v) => { v.hidden = v.dataset.view !== tab; });
+    document.querySelectorAll('.sv-tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === tab)));
+    document.querySelectorAll('.sv-tablewrap').forEach((w) => w.classList.toggle('has-drawer', !!p.sel));
+    document.querySelectorAll('.sv-q').forEach((i) => { if (i !== document.activeElement) i.value = p.q || ''; });
+    const n = SV.current().length, pages = Math.max(1, Math.ceil(n / SV.PAGE)), pg = Math.min(Math.max(1, Number(p.pg) || 1), pages);
+    requestAnimationFrame(SV.lockAlerts);
+    document.querySelectorAll('.sv-prev').forEach((b) => { b.disabled = pg <= 1; });
+    document.querySelectorAll('.sv-next').forEach((b) => { b.disabled = pg >= pages; });
+  });
+
+  // ---------- CSV export of the filtered rows ----------
+  if (window.claude && claude.use) {
+    claude.use('downloads').then((downloads) => {
+      if (!downloads) return;
+      document.querySelectorAll('.sv-export').forEach((btn) => {
+        btn.hidden = false;
+        btn.addEventListener('click', async () => {
+          const g = dash.data('conversations');
+          if (g.status !== 'ok') return;
+          const cols = (g.columns && g.columns.length ? g.columns : Object.keys(g.data[0] || {})).filter((c) => !c.endsWith('_id') || c === 'conversation_id');
+          const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+          const csv = [cols.join(','), ...SV.current().map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n');
+          try { await downloads.save({ filename: `conversations-${SV.week()}.csv`, data: csv }); } catch (e) { /* declined or unavailable */ }
+        });
+      });
+    });
+  }
+</script>
+
+</div>
+<script>window.__svLoad();</script>
+</body>
+</html>

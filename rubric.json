@@ -1,0 +1,106 @@
+[
+{
+"item_type": "Rubric part",
+"order": 1,
+"name": "Accuracy and policy",
+"weight": 0.3,
+"maps_from": "Integrity",
+"description": "Right information, approved sources, the client's actual rules"
+},
+{
+"item_type": "Rubric part",
+"order": 2,
+"name": "Communication",
+"weight": 0.2,
+"maps_from": "Aesthetics",
+"description": "Clear, the right tone, understands the language"
+},
+{
+"item_type": "Rubric part",
+"order": 3,
+"name": "Resolution",
+"weight": 0.25,
+"maps_from": "New",
+"description": "Solved, or correctly moved toward being solved"
+},
+{
+"item_type": "Rubric part",
+"order": 4,
+"name": "Judgment and escalation",
+"weight": 0.25,
+"maps_from": "New",
+"description": "Knew its limits and brought in a person when needed"
+},
+{
+"item_type": "Level",
+"order": 1,
+"name": "Pass",
+"weight": null,
+"maps_from": "",
+"description": "All four parts are fine."
+},
+{
+"item_type": "Level",
+"order": 2,
+"name": "Soft pass",
+"weight": null,
+"maps_from": "",
+"description": "Right outcome, small issue, like awkward wording."
+},
+{
+"item_type": "Level",
+"order": 3,
+"name": "Soft fail",
+"weight": null,
+"maps_from": "",
+"description": "An incomplete or incorrect response that needs correcting, but hasn't caused a serious policy, financial or security issue."
+},
+{
+"item_type": "Level",
+"order": 4,
+"name": "Fail",
+"weight": null,
+"maps_from": "",
+"description": "Wrong information, a wrong action, or a missed escalation."
+},
+{
+"item_type": "Level",
+"order": 5,
+"name": "Critical incident",
+"weight": null,
+"maps_from": "",
+"description": "Privacy breach or unauthorized refund: automatic critical failure and immediate review, no matter how good the rest was."
+},
+{
+"item_type": "Reviewer",
+"order": 1,
+"name": "Maria S.",
+"weight": null,
+"maps_from": "",
+"description": "QA lead: second-scores for calibration and audits security cases"
+},
+{
+"item_type": "Reviewer",
+"order": 2,
+"name": "Paolo R.",
+"weight": null,
+"maps_from": "",
+"description": "QA specialist"
+},
+{
+"item_type": "Reviewer",
+"order": 3,
+"name": "Anika T.",
+"weight": null,
+"maps_from": "",
+"description": "QA specialist"
+},
+{
+"item_type": "Reviewer",
+"order": 4,
+"name": "Ben C.",
+"weight": null,
+"maps_from": "",
+"description": "QA specialist: also audits SLA breaches"
+}
+]
