@@ -166,11 +166,29 @@ body:has(.sv.is-dark) { background: #000; }
 .sv-pair { align-items: stretch; }
 .sv-pair > .sv-card { display: flex; flex-direction: column; }
 .sv-pair .sv-push { margin-top: auto; }
+.sv-rows { display: flex; flex-direction: column; }
+.sv-row { padding: 10px 0; border-top: 1px solid var(--sv-line); display: flex; flex-direction: column; gap: 3px; }
+.sv-row:first-child { border-top: 0; padding-top: 4px; }
+.sv-row-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.sv-row-desc { font-size: 12.5px; color: var(--sv-muted); line-height: 1.45; }
+.sv-wt { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--sv-soft); border-radius: 999px; padding: 2px 9px; }
+.sv-map { margin: 0 0 10px; font-size: 12px; color: var(--sv-muted); line-height: 1.45; padding-left: 10px; border-left: 2px solid var(--sv-line); }
+.sv-gap { margin-top: 18px !important; }
+.sv-action { margin: 10px 0 0; font-size: 13px; line-height: 1.45; padding: 9px 12px; border-radius: 10px; background: var(--sv-soft); }
+.sv .sv-action b { font-weight: 650; }
+.sv-xtab { display: grid; grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(70px, 1fr)); gap: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sv-xtab .h { color: var(--sv-muted); font-weight: 600; font-size: 12px; align-self: end; padding: 4px 6px; }
+.sv-xtab .rh { font-weight: 650; padding: 10px 6px; align-self: center; }
+.sv-xtab button, .sv-xtab .tot { border: 1px solid var(--sv-line); border-radius: 10px; padding: 10px; text-align: center; font-size: 18px; font-weight: 700; background: var(--sv-card); }
+.sv-xtab button { cursor: pointer; }
+.sv-xtab button:hover { border-color: var(--sv-muted); }
+.sv-xtab button.is-warn { background: var(--sv-warn-bg); color: var(--sv-warn); border-color: color-mix(in srgb, var(--sv-warn) 40%, var(--sv-line)); }
+.sv-xtab .tot { background: var(--sv-soft); color: var(--sv-muted); font-size: 15px; }
 .sv-calib { height: 92px; overflow-y: auto; align-content: flex-start; }
 .sv-rub { row-gap: 16px; }
 .sv-lv { row-gap: 10px; }
 .sv-view { display: flex; flex-direction: column; gap: 22px; }
-.sv-qrow { display: grid; grid-template-columns: minmax(130px, 1.4fr) repeat(4, minmax(70px, 1fr)) minmax(80px, 1fr); gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--sv-line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.sv-qrow { display: grid; grid-template-columns: minmax(110px, 1.5fr) repeat(4, minmax(52px, 1fr)) minmax(64px, 1fr); gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--sv-line); font-size: 13px; font-variant-numeric: tabular-nums; }
 .sv-qrow.is-head { color: var(--sv-muted); font-size: 12px; font-weight: 600; padding-top: 0; }
 .sv-qrow small { display: block; color: var(--sv-muted); font-size: 11.5px; }
 .sv-namebtn { background: none; border: 0; padding: 0; text-align: left; color: var(--sv-focus); font-weight: 650; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--sv-focus) 35%, transparent); text-underline-offset: 3px; }
@@ -300,7 +318,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="qa_pass_rate">—</span>
         <span class="sv-kpi-cmp" data-draw="kc" data-kpi="qa_pass_rate" data-source="weekly alerts">—</span>
         <span class="sv-kpi-def">Pass or soft pass, in the QA sample.</span>
-        <span class="sv-kpi-note"><span data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</span> wrong calls still passed: rubric v1 doesn't penalize unnecessary escalations.</span>
+        <span class="sv-kpi-note"><span data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</span> of <span data-draw="iv" data-col="wrong_calls" data-fmt="count" data-source="weekly" data-field="wrong_calls">—</span> wrong calls still passed QA: rubric v1 doesn't penalize unnecessary escalations.</span>
         <span class="sv-kpi-go">View soft fails and fails</span>
       </button>
       <button class="sv-kpi" data-kpi="critical_incidents" data-alerts="critical" data-go='{"crit":"Yes"}'>
@@ -561,28 +579,43 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         <p class="sv-cap">The QA lead second-scores part of the random sample each week. The score is how often both reviewers gave the same level.</p>
         <p class="sv-cap" style="min-height:0"><span data-draw="rv" data-col="agreed" data-fmt="count" data-source="reviews" data-field="agreed">—</span> of <span data-draw="rv" data-col="double_scored" data-fmt="count" data-source="reviews" data-field="double_scored">—</span> double-scored conversations agreed. Disagreements this week, to discuss in calibration:</p>
         <div class="sv-calib" data-draw="disagree" data-source="conversations"></div>
+        <p class="sv-action"><b>Calibration action:</b> Update the rubric to penalize both missed and unnecessary escalations.</p>
         <div class="sv-chart sv-push" data-draw="agreetrend" data-source="reviews" style="padding-top:12px"></div>
       </section>
     </div>
 
-    <section class="sv-card" id="volume" aria-labelledby="vol-title">
-      <h2 class="sv-h2" id="vol-title">QA volume by reviewer</h2>
-      <p class="sv-cap">This week's reviews by person. Select a name to see their reviews in the conversation table.</p>
-      <div class="sv-qrow is-head"><span>Reviewer</span><span>Random sample</span><span>Targeted audits</span><span>Second-scored</span><span>Total</span><span>QA pass rate given</span></div>
-      <div data-draw="volume" data-source="reviewer_volume rubric"></div>
-    </section>
+<div class="sv-grid2 sv-pair">
+      <section class="sv-card" id="volume" aria-labelledby="vol-title">
+        <h2 class="sv-h2" id="vol-title">QA volume by reviewer</h2>
+        <p class="sv-cap">This week's reviews by person. Select a name to see their reviews in the conversation table.</p>
+        <div class="sv-qrow is-head"><span>Reviewer</span><span>Random sample</span><span>Targeted audits</span><span>Second-scored</span><span>Total</span><span>QA pass rate given</span></div>
+        <div data-draw="volume" data-source="reviewer_volume rubric"></div>
+      </section>
+      <section class="sv-card" id="crosscheck" aria-labelledby="xc-title">
+        <h2 class="sv-h2" id="xc-title">QA vs decision quality</h2>
+        <p class="sv-cap">Every reviewed conversation gets both a QA result and a right-call check. They measure different things, so they don't add up the same way. Select a number to see those conversations.</p>
+        <div class="sv-xtab">
+          <span class="h"></span><span class="h">Passed QA</span><span class="h">Failed QA</span><span class="h">Total</span>
+          <span class="rh">Right call</span><button class="" data-xf='{"rtype":"Random sample","right":"Yes","qa":"Passed"}' aria-label="Right call and passed QA"><span data-draw="iv" data-col="right_passed" data-fmt="count" data-source="weekly" data-field="right_passed">—</span></button><button class="" data-xf='{"rtype":"Random sample","right":"Yes","qa":"Failed"}' aria-label="Right call but failed QA"><span data-draw="iv" data-col="right_failed" data-fmt="count" data-source="weekly" data-field="right_failed">—</span></button><span class="tot"><span data-draw="iv" data-col="right_calls" data-fmt="count" data-source="weekly" data-field="right_calls">—</span></span>
+          <span class="rh">Wrong call</span><button class="is-warn" data-xf='{"rtype":"Random sample","right":"No","qa":"Passed"}' aria-label="Wrong call but passed QA"><span data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</span></button><button class="" data-xf='{"rtype":"Random sample","right":"No","qa":"Failed"}' aria-label="Wrong call and failed QA"><span data-draw="iv" data-col="wrong_failed" data-fmt="count" data-source="weekly" data-field="wrong_failed">—</span></button><span class="tot"><span data-draw="iv" data-col="wrong_calls" data-fmt="count" data-source="weekly" data-field="wrong_calls">—</span></span>
+          <span class="rh">Total</span><span class="tot"><span data-draw="iv" data-col="qa_passed" data-fmt="count" data-source="weekly" data-field="qa_passed">—</span></span><span class="tot"><span data-draw="iv" data-col="qa_failed" data-fmt="count" data-source="weekly" data-field="qa_failed">—</span></span><span class="tot"><span data-draw="iv" data-col="qa_reviewed" data-fmt="count" data-source="weekly" data-field="qa_reviewed">—</span></span>
+        </div>
+        <p class="sv-gap sv-push" style="margin-bottom:0">The amber cell is the rubric v1 gap: wrong decisions that still passed QA.</p>
+      </section>
+    </div>
 
     <div class="sv-grid2 sv-pair">
       <section class="sv-card" id="rubric" aria-labelledby="rub-title">
         <h2 class="sv-h2" id="rub-title">The QA rubric</h2>
-        <p class="sv-cap">Each conversation in the random sample is checked on four parts. Mapped from Snappr: Integrity became Accuracy and policy, Aesthetics became Communication. Resolution and Judgment are new, because conversations have outcomes. Weights are illustrative, not yet agreed with a client.</p>
-        <div class="sv-rub" data-draw="rubric" data-source="rubric"></div>
-        <p class="sv-gap sv-push"><b>Known gap in rubric v1.</b> Missed escalations count as fails, but unnecessary escalations aren't penalized, so <b data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</b> wrong calls this week still passed QA. Calibration item: add an unnecessary-escalation check to Judgment and escalation.</p>
+        <p class="sv-cap" style="margin-bottom:4px">Each reviewed conversation is checked on four parts. Weights are illustrative.</p>
+        <p class="sv-map">Mapped from Snappr: Integrity became Accuracy and policy, Aesthetics became Communication. Resolution and Judgment are new, because conversations have outcomes.</p>
+        <div class="sv-rows" data-draw="rubric" data-source="rubric"></div>
+        <p class="sv-gap sv-push"><b>Known gap — Rubric v1:</b> Unnecessary escalations are not currently penalized, allowing incorrect decisions to pass QA.</p>
       </section>
       <section class="sv-card" id="levels-def" aria-labelledby="lv-title">
         <h2 class="sv-h2" id="lv-title">The levels</h2>
         <p class="sv-cap">The level comes from the most serious problem found. A critical incident is always a critical failure.</p>
-        <div class="sv-lv" data-draw="leveldefs" data-source="rubric"></div>
+        <div class="sv-rows" data-draw="leveldefs" data-source="rubric"></div>
       </section>
     </div>
   </div>
@@ -612,9 +645,12 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         return {
           week_start, total, resolved, escalated,
           resolved_rate: resolved / total, escalation_rate: escalated / total,
-          qa_reviewed: sample.length, qa_passed: passed, qa_pass_rate: passed / sample.length,
+          qa_reviewed: sample.length, qa_passed: passed, qa_failed: sample.length - passed, qa_pass_rate: passed / sample.length,
           right_calls: right, wrong_calls: sample.length - right, right_call_rate: right / sample.length,
           wrong_but_passed: sample.filter((c) => c.right_call === 'No' && (c.qa_level === 'Pass' || c.qa_level === 'Soft pass')).length,
+          right_passed: sample.filter((c) => c.right_call === 'Yes' && (c.qa_level === 'Pass' || c.qa_level === 'Soft pass')).length,
+          right_failed: sample.filter((c) => c.right_call === 'Yes' && !(c.qa_level === 'Pass' || c.qa_level === 'Soft pass')).length,
+          wrong_failed: sample.filter((c) => c.right_call === 'No' && !(c.qa_level === 'Pass' || c.qa_level === 'Soft pass')).length,
           esc_reviewed: escSample.length, esc_not_needed: notNeeded, esc_needed: escSample.length - notNeeded,
           esc_not_needed_rate: escSample.length ? notNeeded / escSample.length : null,
           critical_incidents: rows.filter((c) => c.critical_incident === 'Yes').length,
@@ -759,6 +795,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         const v = p[k];
         if (v == null || v === '') continue;
         if (k === 'qa' && v === 'Failed') { if (!(c.qa_level === 'Soft fail' || c.qa_level === 'Fail')) return false; continue; }
+        if (k === 'qa' && v === 'Passed') { if (!(c.qa_level === 'Pass' || c.qa_level === 'Soft pass')) return false; continue; }
         if (c[SV.COL[k]] !== v) return false;
       }
       if (q && ![c.conversation_id, c.topic, c.language, c.outcome, c.escalation_reason, c.qa_level, c.handoff_status].join(' ').toLowerCase().includes(q)) return false;
@@ -1100,7 +1137,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     const p = dash.params();
     SV.FILTERS.filter((k) => p[k] != null && p[k] !== '').forEach((k) => {
       const b = document.createElement('button');
-      const v = k === 'qa' && p[k] === 'Failed' ? 'Soft fail or fail' : (k === 'd1' || k === 'd2') ? SV.fmt.day(p[k]) : p[k];
+      const v = k === 'qa' && p[k] === 'Failed' ? 'Soft fail or fail' : k === 'qa' && p[k] === 'Passed' ? 'Pass or soft pass' : (k === 'd1' || k === 'd2') ? SV.fmt.day(p[k]) : p[k];
       b.textContent = `${SV.LABEL[k]}: ${v === '—' ? 'Not applicable' : v} ×`;
       b.setAttribute('aria-label', `Remove filter ${SV.LABEL[k]}`);
       b.addEventListener('click', () => dash.setParams({ [k]: null, pg: 1 }));
@@ -1242,10 +1279,14 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     const g = dash.data('rubric');
     if (g.status !== 'ok') return;
     g.data.filter((r) => r.item_type === 'Rubric part').sort((a, b) => a.order - b.order).forEach((r) => {
+      const row = document.createElement('div'); row.className = 'sv-row';
+      const top = document.createElement('div'); top.className = 'sv-row-top';
       const name = document.createElement('b'); name.textContent = r.name;
-      const d = document.createElement('div'); d.textContent = r.description;
-      const w = document.createElement('span'); w.className = 'w'; w.textContent = SV.fmt.pct(r.weight);
-      el.append(name, d, w);
+      const w = document.createElement('span'); w.className = 'sv-wt'; w.textContent = SV.fmt.pct(r.weight);
+      top.append(name, w);
+      const d = document.createElement('div'); d.className = 'sv-row-desc'; d.textContent = r.description;
+      row.append(top, d);
+      el.append(row);
     });
   });
   dash.draw('leveldefs', (el) => {
@@ -1254,14 +1295,18 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     if (g.status !== 'ok') return;
     const cls = { 'Pass': 'is-ok', 'Soft pass': 'is-ok', 'Soft fail': 'is-warn', 'Fail': 'is-bad', 'Critical incident': 'is-bad' };
     g.data.filter((r) => r.item_type === 'Level').sort((a, b) => a.order - b.order).forEach((r) => {
+      const row = document.createElement('div'); row.className = 'sv-row';
+      const top = document.createElement('div'); top.className = 'sv-row-top';
       const t = document.createElement('span'); t.className = 'sv-tag ' + (cls[r.name] || ''); t.textContent = r.name;
-      const holder = document.createElement('div'); holder.append(t);
-      const d = document.createElement('div'); d.textContent = r.description;
-      el.append(holder, d);
+      top.append(t);
+      const d = document.createElement('div'); d.className = 'sv-row-desc'; d.textContent = r.description;
+      row.append(top, d);
+      el.append(row);
     });
   });
 
   // ---------- controls that listen and set state ----------
+  document.querySelectorAll('.sv-xtab button[data-xf]').forEach((b) => b.addEventListener('click', () => SV.go(JSON.parse(b.dataset.xf))));
   document.querySelectorAll('.sv-tab').forEach((b) => b.addEventListener('click', () => dash.setParams({ tab: b.dataset.tab === 'overview' ? null : b.dataset.tab })));
   const P = () => dash.params();
   document.querySelectorAll('.sv-kpi').forEach((b) => b.addEventListener('click', () => SV.go(JSON.parse(b.dataset.go))));
