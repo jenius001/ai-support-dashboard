@@ -172,7 +172,7 @@
 {
 "template_id": "s03",
 "kind": "step",
-"text": "Immediate review: contain the privacy issue, notify the client, and fix the agent's instructions."
+"text": "Contain first: pause the affected workflow or action (for example, refunds), review the agent's permissions, then investigate and notify the client."
 },
 {
 "template_id": "s04",

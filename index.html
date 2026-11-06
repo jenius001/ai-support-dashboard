@@ -101,6 +101,9 @@ body:has(.sv.is-dark) { background: #000; }
 .sv-kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .sv-kpi-cmp { font-size: 12px; color: var(--sv-muted); font-variant-numeric: tabular-nums; }
 .sv-kpi-def { font-size: 11.5px; color: var(--sv-muted); line-height: 1.35; margin-top: 4px; }
+.sv-kpi-note { font-size: 11.5px; line-height: 1.35; color: var(--sv-warn); font-weight: 600; }
+.sv-gap { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--sv-warn-bg); font-size: 13px; line-height: 1.45; }
+.sv .sv-gap b { color: var(--sv-warn); }
 .sv-kpi-go { font-size: 11.5px; color: var(--sv-focus); font-weight: 600; margin-top: 2px; }
 .sv-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; align-items: start; }
 .sv-strip { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--sv-muted); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
@@ -263,6 +266,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
       <li><b>Filters.</b> The week drives the six numbers, the alerts and the charts. From and To narrow the conversation table to days within that week.</li>
       <li><b>QA sample.</b> Each week, a random sample of conversations, stratified by outcome, is reviewed: <b data-draw="iv" data-col="qa_reviewed" data-fmt="count" data-source="weekly" data-field="qa_reviewed">—</b> this week. QA pass rate and right-call rate both come from this same random sample. Targeted risk audits are reported separately in Quality &amp; Audits, so they never skew the QA pass rate. Unreviewed conversations are shown as Not reviewed, never as passed.</li>
       <li><b>QA pass rate vs right-call rate.</b> QA pass rate is pass or soft pass. Right-call rate is whether the agent correctly chose to resolve, clarify or escalate. QA rubric v1 scored the reply and penalized missed escalations, but not unnecessary ones. That's why <b data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</b> wrong calls this week still passed QA. Fixing the rubric is a calibration item.</li>
+      <li><b>Repeat contacts</b> count a customer coming back about the same issue within 7 days of an AI-handled conversation. The latest week is provisional until 7 days have passed, so its figure can still rise.</li>
       <li><b>Customer resolution</b> is separate from QA: a conversation can pass QA but still be pending with a person, or come back as a repeat contact.</li>
       <li><b>SLA (illustrative).</b> A person responds within <b data-draw="iv" data-col="limit" data-fmt="min" data-source="alerts" data-field="limit" data-alert="overdue">—</b> of a handoff. Waiting past that is overdue, and counts as an SLA breach.</li>
     </ul>
@@ -277,11 +281,11 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
   <section id="kpis" aria-labelledby="kpis-title">
     <h2 class="sv-h2" id="kpis-title" style="margin-bottom:10px">This week</h2>
     <div class="sv-kpis">
-      <button class="sv-kpi" data-kpi="resolved_rate" data-alerts="" data-go='{"outcome":"Resolved by AI"}'>
-        <span class="sv-kpi-label">Resolved by AI</span>
+      <button class="sv-kpi" data-kpi="resolved_rate" data-alerts="" data-go='{"outcome":"Handled by AI"}'>
+        <span class="sv-kpi-label">Handled by AI</span>
         <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="resolved_rate">—</span>
         <span class="sv-kpi-cmp" data-draw="kc" data-kpi="resolved_rate" data-source="weekly">—</span>
-        <span class="sv-kpi-def">Handled fully by the AI, without a person.</span>
+        <span class="sv-kpi-def">Closed without a handoff to a person. Doesn't guarantee the issue was solved: see repeat contacts.</span>
         <span class="sv-kpi-go">View conversations</span>
       </button>
       <button class="sv-kpi" data-kpi="right_call_rate" data-alerts="right_call_low" data-go='{"right":"No"}'>
@@ -296,6 +300,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="qa_pass_rate">—</span>
         <span class="sv-kpi-cmp" data-draw="kc" data-kpi="qa_pass_rate" data-source="weekly alerts">—</span>
         <span class="sv-kpi-def">Pass or soft pass, in the QA sample.</span>
+        <span class="sv-kpi-note"><span data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</span> wrong calls still passed: rubric v1 doesn't penalize unnecessary escalations.</span>
         <span class="sv-kpi-go">View soft fails and fails</span>
       </button>
       <button class="sv-kpi" data-kpi="critical_incidents" data-alerts="critical" data-go='{"crit":"Yes"}'>
@@ -312,11 +317,11 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         <span class="sv-kpi-def">Share of conversations handed to a person.</span>
         <span class="sv-kpi-go">View escalations</span>
       </button>
-      <button class="sv-kpi" data-kpi="repeat_rate" data-alerts="repeat_high" data-go='{"outcome":"Resolved by AI","repeat":"Yes"}'>
+      <button class="sv-kpi" data-kpi="repeat_rate" data-alerts="repeat_high" data-go='{"outcome":"Handled by AI","repeat":"Yes"}'>
         <span class="sv-kpi-label">Repeat contacts <span class="sv-kpi-flag" hidden>Alert</span><span class="sv-kpi-good" hidden>On target</span></span>
         <span class="sv-kpi-value" data-draw="kv" data-fmt="pct" data-source="weekly" data-field="repeat_rate">—</span>
         <span class="sv-kpi-cmp" data-draw="kc" data-kpi="repeat_rate" data-source="weekly alerts">—</span>
-        <span class="sv-kpi-def">AI-resolved conversations where the customer came back about the same issue.</span>
+        <span class="sv-kpi-def">AI-handled conversations where the customer came back about the same issue within 7 days.</span>
         <span class="sv-kpi-go">View repeat contacts</span>
       </button>
     </div>
@@ -328,27 +333,27 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
       <p class="sv-cap">Only triggered alerts are shown. Select one to filter the conversations below.</p>
       <span class="sv-alertvis" data-draw="alertvis" data-source="alerts"></span>
       <ul class="sv-alerts">
-        <li data-alert="critical" hidden><button class="sv-al-btn" data-alert="critical"><span class="sv-sev is-critical">Critical</span><span class="sv-al-name">Critical incident</span><span class="sv-al-val">Now <b data-draw="av" data-alert="critical" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="critical" data-col="limit" data-fmt="count" data-source="alerts" data-field="limit">—</b> or more</span><span class="sv-al-act">Immediate review, regardless of escalation rate or overall QA score.</span></button></li>
+        <li data-alert="critical" hidden><button class="sv-al-btn" data-alert="critical"><span class="sv-sev is-critical">Critical</span><span class="sv-al-name">Critical incident</span><span class="sv-al-val">Now <b data-draw="av" data-alert="critical" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="critical" data-col="limit" data-fmt="count" data-source="alerts" data-field="limit">—</b> or more</span><span class="sv-al-act">Contain first: pause the affected workflow or action (for example, refunds), review the agent's permissions, then investigate and notify the client. Don't wait on escalation rate or overall QA score.</span></button></li>
         <li data-alert="overdue" hidden><button class="sv-al-btn" data-alert="overdue"><span class="sv-sev is-high">High</span><span class="sv-al-name">Overdue handoffs</span><span class="sv-al-val">Now <b data-draw="av" data-alert="overdue" data-col="value" data-fmt="count" data-source="alerts" data-field="value">—</b> waiting past <b data-draw="av" data-alert="overdue" data-col="limit" data-fmt="min" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Assign each one now and update the customer.</span></button></li>
         <li data-alert="esc_spike" hidden><button class="sv-al-btn" data-alert="esc_spike"><span class="sv-sev is-high">High</span><span class="sv-al-name">Escalations increased sharply</span><span class="sv-al-val">Now <b data-draw="av" data-alert="esc_spike" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="esc_spike" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b>, well above the recent average</span><span class="sv-al-act">Check customer issue types, recent policy changes, system errors, and whether the human queue can handle the volume.</span></button></li>
         <li data-alert="esc_drop" hidden><button class="sv-al-btn" data-alert="esc_drop"><span class="sv-sev is-high">High</span><span class="sv-al-name">Escalations dropped sharply</span><span class="sv-al-val">Now <b data-draw="av" data-alert="esc_drop" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · threshold <b data-draw="av" data-alert="esc_drop" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b>, well below the recent average</span><span class="sv-al-act">Review AI-handled conversations for missed escalations, unauthorized actions, and changes to the agent's instructions.</span></button></li>
         <li data-alert="sla_breach" hidden><button class="sv-al-btn" data-alert="sla_breach"><span class="sv-sev is-high">High</span><span class="sv-al-name">SLA breaches</span><span class="sv-al-val">Now <b data-draw="av" data-alert="sla_breach" data-col="value" data-fmt="pct1" data-source="alerts" data-field="value">—</b> of handoffs · threshold <b data-draw="av" data-alert="sla_breach" data-col="limit" data-fmt="pct1" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Check queue staffing for the busiest time slots, and whether the extra escalations are swamping the team.</span></button></li>
         <li data-alert="right_call_low" hidden><button class="sv-al-btn" data-alert="right_call_low"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">Right-call rate below target</span><span class="sv-al-val">Now <b data-draw="av" data-alert="right_call_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · target <b data-draw="av" data-alert="right_call_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Review the wrong calls in both escalated and AI-handled conversations, then calibrate.</span></button></li>
         <li data-alert="qa_low" hidden><button class="sv-al-btn" data-alert="qa_low"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">QA pass rate below target</span><span class="sv-al-val">Now <b data-draw="av" data-alert="qa_low" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · target <b data-draw="av" data-alert="qa_low" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Review the soft fails and fails, find the cause, then calibrate.</span></button></li>
-        <li data-alert="repeat_high" hidden><button class="sv-al-btn" data-alert="repeat_high"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">Repeat contacts rising</span><span class="sv-al-val">Now <b data-draw="av" data-alert="repeat_high" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · limit <b data-draw="av" data-alert="repeat_high" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Check whether conversations marked resolved were really solved.</span></button></li>
+        <li data-alert="repeat_high" hidden><button class="sv-al-btn" data-alert="repeat_high"><span class="sv-sev is-medium">Medium</span><span class="sv-al-name">Repeat contacts rising (within 7 days)</span><span class="sv-al-val">Now <b data-draw="av" data-alert="repeat_high" data-col="value" data-fmt="pct" data-source="alerts" data-field="value">—</b> · limit <b data-draw="av" data-alert="repeat_high" data-col="limit" data-fmt="pct" data-source="alerts" data-field="limit">—</b></span><span class="sv-al-act">Check whether conversations marked resolved were really solved.</span></button></li>
         <li data-alert="none" hidden><p class="sv-cap" style="margin:0">No alerts are triggered this week.</p></li>
       </ul>
 
       <div class="sv-detail-panel" id="alert-detail" hidden style="margin-top:10px">
         <p><b>Filtered below:</b> <span data-draw="matchcount" data-source="conversations">—</span>. <button class="sv-link sv-clear-alert">Clear</button></p>
-        <p data-alert-note="critical" hidden>Shows the critical incident. Contain it first, then fix the instructions that allowed it.</p>
+        <p data-alert-note="critical" hidden>Shows the critical incident. Contain it first: pause the affected workflow and review the agent's permissions. Then fix the instructions that allowed it.</p>
         <p data-alert-note="overdue" hidden>Shows handoffs still waiting past the SLA. Each needs an owner now.</p>
         <p data-alert-note="esc_spike" hidden>Shows all escalations. Use the reasons chart to see which kind grew.</p>
         <p data-alert-note="esc_drop" hidden>Shows AI-handled conversations. Check the reviewed ones for missed escalations.</p>
         <p data-alert-note="sla_breach" hidden>Shows handoffs that breached the SLA, including overdue ones.</p>
         <p data-alert-note="right_call_low" hidden>Shows reviewed conversations where the decision was wrong.</p>
         <p data-alert-note="qa_low" hidden>Shows reviewed conversations that soft-failed or failed.</p>
-        <p data-alert-note="repeat_high" hidden>Shows AI-resolved conversations where the customer came back.</p>
+        <p data-alert-note="repeat_high" hidden>Shows AI-handled conversations where the customer came back within 7 days.</p>
       </div>
 
       <details class="sv-rules">
@@ -572,6 +577,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         <h2 class="sv-h2" id="rub-title">The QA rubric</h2>
         <p class="sv-cap">Each conversation in the random sample is checked on four parts. Mapped from Snappr: Integrity became Accuracy and policy, Aesthetics became Communication. Resolution and Judgment are new, because conversations have outcomes. Weights are illustrative, not yet agreed with a client.</p>
         <div class="sv-rub" data-draw="rubric" data-source="rubric"></div>
+        <p class="sv-gap sv-push"><b>Known gap in rubric v1.</b> Missed escalations count as fails, but unnecessary escalations aren't penalized, so <b data-draw="iv" data-col="wrong_but_passed" data-fmt="count" data-source="weekly" data-field="wrong_but_passed">—</b> wrong calls this week still passed QA. Calibration item: add an unnecessary-escalation check to Judgment and escalation.</p>
       </section>
       <section class="sv-card" id="levels-def" aria-labelledby="lv-title">
         <h2 class="sv-h2" id="lv-title">The levels</h2>
@@ -601,7 +607,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
         const right = sample.filter((c) => c.right_call === 'Yes').length;
         const escSample = sample.filter((c) => c.outcome === 'Escalated');
         const notNeeded = escSample.filter((c) => c.right_call === 'No').length;
-        const repeat = rows.filter((c) => c.outcome === 'Resolved by AI' && c.repeat_contact === 'Yes').length;
+        const repeat = rows.filter((c) => c.outcome === 'Handled by AI' && c.repeat_contact === 'Yes').length;
         const breached = rows.filter((c) => c.sla_status === 'Breached').length;
         return {
           week_start, total, resolved, escalated,
@@ -664,7 +670,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
       return {
         week_start, total: rows.length,
         random: rnd.length, random_rate: rnd.length / rows.length,
-        random_ai: rnd.filter((c) => c.outcome === 'Resolved by AI').length,
+        random_ai: rnd.filter((c) => c.outcome === 'Handled by AI').length,
         random_esc: rnd.filter((c) => c.outcome === 'Escalated').length,
         targeted: tgt.length,
         targeted_security: tgt.filter((c) => c.escalation_reason === 'Security or fraud' || c.escalation_reason === 'Sensitive information').length,
@@ -739,6 +745,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     if (g.status !== 'ok' || !g.data.length) return p || null;
     return g.data.some((w) => w.week_start === p) ? p : g.data[g.data.length - 1].week_start;
   };
+  SV.isLatest = () => { const g = dash.data('weekly'); return g.status === 'ok' && g.data.length > 0 && SV.week() === g.data[g.data.length - 1].week_start; };
   SV.weekRow = () => { const g = dash.data('weekly'); const wk = SV.week(); return g.status === 'ok' ? g.data.find((w) => w.week_start === wk) || null : null; };
   SV.alertRow = (id) => { const g = dash.data('alerts'); const wk = SV.week(); return g.status === 'ok' ? g.data.find((a) => a.week_start === wk && a.alert === id) || null : null; };
   // the filter every view uses: pure, so it can be tested
@@ -780,8 +787,8 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     document.querySelectorAll('#conversations').forEach((s) => s.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
   SV.ALERT_FILTER = {
-    critical: { crit: 'Yes' }, overdue: { handoff: 'Overdue' }, esc_spike: { outcome: 'Escalated' }, esc_drop: { outcome: 'Resolved by AI' },
-    sla_breach: { sla: 'Breached' }, right_call_low: { right: 'No' }, qa_low: { qa: 'Failed' }, repeat_high: { outcome: 'Resolved by AI', repeat: 'Yes' },
+    critical: { crit: 'Yes' }, overdue: { handoff: 'Overdue' }, esc_spike: { outcome: 'Escalated' }, esc_drop: { outcome: 'Handled by AI' },
+    sla_breach: { sla: 'Breached' }, right_call_low: { right: 'No' }, qa_low: { qa: 'Failed' }, repeat_high: { outcome: 'Handled by AI', repeat: 'Yes' },
   };
   SV.keyed = (sel, fn) => sel.attr('tabindex', 0).attr('role', 'button').on('click', fn).on('keydown', (e, d) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e, d); } });
 
@@ -826,7 +833,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
       qa_pass_rate: () => `${f.count(w.qa_passed)} of ${f.count(w.qa_reviewed)} reviewed · target ${f.pct(a('qa_low')?.limit)}`,
       critical_incidents: () => `Target 0 · last week ${f.count(w.prev_critical)}`,
       escalation_rate: () => w.avg_escalation_rate == null ? `${f.count(w.escalated)} of ${f.count(w.total)} · no earlier weeks` : `${f.count(w.escalated)} of ${f.count(w.total)} · ${w.prior_weeks}-week avg ${f.pct(w.avg_escalation_rate)}`,
-      repeat_rate: () => `${f.count(w.repeat_contacts)} of ${f.count(w.resolved)} · limit ${f.pct(a('repeat_high')?.limit)}`,
+      repeat_rate: () => `${f.count(w.repeat_contacts)} of ${f.count(w.resolved)} · limit ${f.pct(a('repeat_high')?.limit)}${SV.isLatest() ? ' · provisional' : ''}`,
     }[el.dataset.kpi] || (() => '—'))();
   });
   dash.draw('av', (el) => {
@@ -866,7 +873,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     const p = dash.params();
     const all = el.dataset.which === 'all';
     const parts = all
-      ? [{ label: 'AI-handled', short: 'AI-handled', n: w.resolved, color: 'var(--sv-ai)', text: '#fff', f: { outcome: 'Resolved by AI' } }, { label: 'Escalated', short: 'escalated', n: w.escalated, color: 'var(--sv-esc)', text: '#fff', f: { outcome: 'Escalated' } }]
+      ? [{ label: 'AI-handled', short: 'AI-handled', n: w.resolved, color: 'var(--sv-ai)', text: '#fff', f: { outcome: 'Handled by AI' } }, { label: 'Escalated', short: 'escalated', n: w.escalated, color: 'var(--sv-esc)', text: '#fff', f: { outcome: 'Escalated' } }]
       : [{ label: 'Needed a person', short: 'needed', n: w.esc_needed, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { outcome: 'Escalated', right: 'Yes' } }, { label: "Didn't need one", short: "didn't need", n: w.esc_not_needed, color: 'var(--sv-warn)', text: '#fff', f: { outcome: 'Escalated', right: 'No' } }];
     const total = d3.sum(parts, (d) => d.n) || 1;
     const W = Math.max(el.clientWidth, 260), H = 34;
@@ -1031,7 +1038,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
   });
 
   // ---------- table ----------
-  const TAG = { 'Resolved by AI': 'is-ok', 'Escalated': '', 'Breached': 'is-bad', 'Met': 'is-ok', 'Pending': 'is-warn', 'Overdue': 'is-bad', 'Waiting': 'is-warn', 'Picked up': '', 'Pass': 'is-ok', 'Soft pass': 'is-ok', 'Soft fail': 'is-warn', 'Fail': 'is-bad', 'Not reviewed': 'is-muted', 'Audit only': 'is-muted' };
+  const TAG = { 'Handled by AI': 'is-ok', 'Escalated': '', 'Breached': 'is-bad', 'Met': 'is-ok', 'Pending': 'is-warn', 'Overdue': 'is-bad', 'Waiting': 'is-warn', 'Picked up': '', 'Pass': 'is-ok', 'Soft pass': 'is-ok', 'Soft fail': 'is-warn', 'Fail': 'is-bad', 'Not reviewed': 'is-muted', 'Audit only': 'is-muted' };
   const TAGGED = new Set(['outcome', 'handoff_status', 'sla_status', 'qa_level']);
   dash.draw('rows', (tb) => {
     tb.replaceChildren();
@@ -1160,7 +1167,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     const r = SV.revRow();
     if (!r) return;
     const parts = el.dataset.which === 'outcome'
-      ? [{ label: 'AI-handled', n: r.random_ai, color: 'var(--sv-ai)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Resolved by AI' } }, { label: 'Escalated', n: r.random_esc, color: 'var(--sv-esc)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Escalated' } }]
+      ? [{ label: 'AI-handled', n: r.random_ai, color: 'var(--sv-ai)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Handled by AI' } }, { label: 'Escalated', n: r.random_esc, color: 'var(--sv-esc)', text: '#fff', f: { rtype: 'Random sample', outcome: 'Escalated' } }]
       : [{ label: 'No issue', n: r.audit_ok, color: 'var(--sv-esc-soft)', text: 'var(--sv-fg)', f: { finding: 'No issue' } }, { label: 'Late pickup', n: r.audit_late, color: 'var(--sv-warn)', text: '#fff', f: { finding: 'Issue found: late pickup' } }, { label: 'Other issue', n: r.audit_other, color: 'var(--sv-bad)', text: '#fff', f: { finding: 'Issue found' } }];
     const total = d3.sum(parts, (d) => d.n) || 1;
     const W = Math.max(el.clientWidth, 220), H = 30;
@@ -1273,6 +1280,7 @@ details[open] > summary .sv-hint .is-open { display: none; } details[open] > sum
     const open = b.getAttribute('aria-expanded') !== 'true';
     b.setAttribute('aria-expanded', String(open));
     document.querySelectorAll('#adv').forEach((a) => { a.hidden = !open; });
+    if (open) requestAnimationFrame(() => { dash.draw('opts'); dash.draw('advcount'); });
   }));
   document.querySelectorAll('.sv-q').forEach((inp) => inp.addEventListener('input', () => dash.setParams({ q: inp.value || null, pg: 1 })));
   document.querySelectorAll('.sv-table th[data-sort] button').forEach((b) => b.addEventListener('click', () => {
